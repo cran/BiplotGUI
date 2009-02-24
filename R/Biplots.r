@@ -1,39 +1,9 @@
-if (Sys.info()["sysname"] != "Windows")
-  stop("BiplotGUI is currently intended to be run under Windows.")
-
-.BiplotGUI.loaded <- FALSE
-
-.First.lib<-function (lib, pkg)
-{
-    if (!.BiplotGUI.loaded) {
-        chname <- "BiplotGUI"
-        file.ext <- .Platform$dynlib.ext
-        dlname <- paste(chname, file.ext, sep = "")
-        if (is.character(.Platform$r_arch) && .Platform$r_arch !=
-            "")
-            path <- file.path("libs", .Platform$r_arc, dlname)
-        else path <- file.path("libs", dlname)
-        file <- system.file(path, package = pkg, lib.loc = lib)[1]
-        dyn.load(file)
-        .BiplotGUI.loaded <<- TRUE
-    }
-}
-
-`Biplots` <-
+Biplots <-
 function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data), 
     AxisLabels = colnames(Data), excel = NULL, ExcelGroupsCol = 0) 
 {
-    RequirePackage <- function(package) {
-        if (data.class(try(.find.package(package), TRUE)) == 
-            "try-error") 
-            stop(paste("Cannot find the `", package, "' package. Please download and install.", 
-                sep = ""))
-        else require(package, character.only = TRUE, quietly = TRUE)
-    }
     tclRequire("BWidget")
-    graphics.off()
     if (!missing(excel)) {
-        RequirePackage("xlsReadWrite")
         Data <- read.xls(excel)
         if (ExcelGroupsCol > 0) {
             groups <- Data[, ExcelGroupsCol]
@@ -60,6 +30,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     if (missing(AxisLabels) && is.null(AxisLabels)) 
         AxisLabels <- paste("V", 1:p, sep = "")
     eps <- 1e-08
+    boptions <- list()
+    boptions$MDS.convergence <- 1e-06
+    boptions$MDS.MaximumIterations <- 5000
+    boptions$Procrustes.convergence <- 1e-06
+    boptions$Procrustes.MaximumIterations <- 5000
+    boptions$IterationsToLiveUpdate <- 5
+    boptions$ReuseExternalWindows <- FALSE
+    boptions$ThreeD.FlyBy <- FALSE
+    boptions$ThreeD.MouseButtonAction <- c("trackball", "zoom", 
+        "fov")
+    boptions$axes.tick.inter.n <- rep(20, p)
     bpar <- list()
     bpar.initialise1.func <- function() {
         bpar$groups.label.text <<- levels(group)
@@ -234,17 +215,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         bparp$points.label.VertOffset <<- rep(bpar$gpoints.label.VertOffset, 
             times = g.n)[temp1]
     }
-    boptions <- list()
-    boptions$MDS.convergence <- 1e-06
-    boptions$MDS.MaximumIterations <- 5000
-    boptions$Procrustes.convergence <- 1e-06
-    boptions$Procrustes.MaximumIterations <- 5000
-    boptions$IterationsToLiveUpdate <- 5
-    boptions$ReuseExternalWindows <- FALSE
-    boptions$ThreeD.FlyBy <- TRUE
-    boptions$ThreeD.MouseButtonAction <- c("trackball", "zoom", 
-        "fov")
-    boptions$axes.tick.inter.n <- rep(20, p)
+    graphics.off()
     mytkrplot <- function(fun, hscale = 1, vscale = 1, ...) {
         image <- paste("Rplot", .make.tkindex(), sep = "")
         .my.tkdev(hscale, vscale)
@@ -340,39 +311,26 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         else plot(x, y, type = "n", xlab = "", asp = 1, ylab = "", 
             ...)
     }
-    SquareRootMatrix <- function(mat) {
-        temp1 <- svd(mat)
-        if (min(temp1$d) <= 0) 
-            stop("mat is required to be positive definite.")
-        temp2 <- temp1$u %*% diag(sqrt(temp1$d)) %*% t(temp1$u)
-        (temp2 + t(temp2))/2
-    }
-    text2hex <- function(textcol) {
-        WhichSystemButtonFace <- which(textcol == "SystemButtonFace")
-        if (.Platform$OS.type == "unix") 
-            textcol[WhichSystemButtonFace] <- "white"
-        else textcol[WhichSystemButtonFace] <- NA
-        temp1 <- col2rgb(textcol)/256
-        temp2 <- rgb(temp1[1], temp1[2], temp1[3])
-        if (.Platform$OS.type != "unix") 
-            temp2[WhichSystemButtonFace] <- "SystemButtonFace"
-        temp2
-    }
-    tkchooseColor <- function(...) tcl("tk_chooseColor", ...)
     legend2 <- function(x, y = NULL, legend, fill = NULL, col = par("col"), 
         lines.col = col, lty, lwd, pch, angle = 45, density = NULL, 
         bty = "o", bg = par("bg"), box.lwd = par("lwd"), box.lty = par("lty"), 
-        pt.bg = NA, cex = 1, pt.cex = cex, pt.lwd = lwd, xjust = 0, 
-        yjust = 1, x.intersp = 1, y.intersp = 1, adj = c(0, 0.5), 
-        text.width = NULL, text.col = par("col"), merge = do.lines && 
-            has.pch, trace = FALSE, plot = TRUE, ncol = 1, horiz = FALSE, 
-        title = NULL, inset = 0) {
+        box.col = par("fg"), pt.bg = NA, cex = 1, pt.cex = cex, 
+        pt.lwd = lwd, xjust = 0, yjust = 1, x.intersp = 1, y.intersp = 1, 
+        adj = c(0, 0.5), text.width = NULL, text.col = par("col"), 
+        merge = do.lines && has.pch, trace = FALSE, plot = TRUE, 
+        ncol = 1, horiz = FALSE, title = NULL, inset = 0, xpd, 
+        title.col = text.col) {
         if (missing(legend) && !missing(y) && (is.character(y) || 
             is.expression(y))) {
             legend <- y
             y <- NULL
         }
         mfill <- !missing(fill) || !missing(density)
+        if (!missing(xpd)) {
+            op <- par("xpd")
+            on.exit(par(xpd = op))
+            par(xpd = xpd)
+        }
         title <- as.graphicsAnnot(title)
         if (length(title) > 1) 
             stop("invalid title")
@@ -450,8 +408,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 cex = cex)))
         else if (!is.numeric(text.width) || text.width < 0) 
             stop("'text.width' must be numeric, >= 0")
-        xc <- Cex * xinch(cin[1], warn.log = FALSE)
-        yc <- Cex * yinch(cin[2], warn.log = FALSE)
+        xc <- Cex * xinch(cin[1L], warn.log = FALSE)
+        yc <- Cex * yinch(cin[2L], warn.log = FALSE)
         if (xc < 0) 
             text.width <- -text.width
         xchar <- xc
@@ -478,20 +436,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             1
         }
         else ceiling(n.leg/ncol)
-        if (has.pch <- !missing(pch) && length(pch) > 0) {
-            if (is.character(pch) && !is.na(pch[1]) && nchar(pch[1], 
+        has.pch <- !missing(pch) && length(pch) > 0
+        if (do.lines) {
+            x.off <- if (merge) 
+                -0.7
+            else 0
+        }
+        else if (merge) 
+            warning("'merge = TRUE' has no effect when no line segments are drawn")
+        if (has.pch) {
+            if (is.character(pch) && !is.na(pch[1L]) && nchar(pch[1L], 
                 type = "c") > 1) {
                 if (length(pch) > 1) 
-                  warning("not using pch[2..] since pch[1] has multiple chars")
-                np <- nchar(pch[1], type = "c")
-                pch <- substr(rep.int(pch[1], np), 1:np, 1:np)
+                  warning("not using pch[2..] since pch[1L] has multiple chars")
+                np <- nchar(pch[1L], type = "c")
+                pch <- substr(rep.int(pch[1L], np), 1L:np, 1L:np)
             }
-            if (!merge) 
-                dx.pch <- x.intersp/2 * xchar
         }
-        x.off <- if (merge) 
-            -0.7
-        else 0
         if (is.na(auto)) {
             if (xlog) 
                 x <- log10(x)
@@ -501,8 +462,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         if (nx == 2) {
             x <- sort(x)
             y <- sort(y)
-            left <- x[1]
-            top <- y[2]
+            left <- x[1L]
+            top <- y[2L]
             w <- diff(x)
             h <- diff(y)
             w0 <- w/ncol
@@ -519,13 +480,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             w0 <- text.width + (x.intersp + 1) * xchar
             if (mfill) 
                 w0 <- w0 + dx.fill
-            if (has.pch && !merge) 
-                w0 <- w0 + dx.pch
             if (do.lines) 
                 w0 <- w0 + (2 + x.off) * xchar
             w <- ncol * w0 + 0.5 * xchar
-            if (!is.null(title) && (tw <- strwidth(title, units = "user", 
-                cex = cex) + 0.5 * xchar) > w) {
+            if (!is.null(title) && (abs(tw <- strwidth(title, 
+                units = "user", cex = cex) + 0.5 * xchar)) > 
+                abs(w)) {
                 xextra <- (tw - w)/2
                 w <- tw
             }
@@ -536,16 +496,16 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             else {
                 usr <- par("usr")
                 inset <- rep(inset, length.out = 2)
-                insetx <- inset[1] * (usr[2] - usr[1])
+                insetx <- inset[1L] * (usr[2L] - usr[1L])
                 left <- switch(auto, bottomright = , topright = , 
-                  right = usr[2] - w - insetx, bottomleft = , 
-                  left = , topleft = usr[1] + insetx, bottom = , 
-                  top = , center = (usr[1] + usr[2] - w)/2)
-                insety <- inset[2] * (usr[4] - usr[3])
+                  right = usr[2L] - w - insetx, bottomleft = , 
+                  left = , topleft = usr[1L] + insetx, bottom = , 
+                  top = , center = (usr[1L] + usr[2L] - w)/2)
+                insety <- inset[2L] * (usr[4L] - usr[3L])
                 top <- switch(auto, bottomright = , bottom = , 
-                  bottomleft = usr[3] + h + insety, topleft = , 
-                  top = , topright = usr[4] - insety, left = , 
-                  right = , center = (usr[3] + usr[4] + h)/2)
+                  bottomleft = usr[3L] + h + insety, topleft = , 
+                  top = , topright = usr[4L] - insety, left = , 
+                  right = , center = (usr[3L] + usr[4L] + h)/2)
             }
         }
         if (plot && bty != "n") {
@@ -553,12 +513,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 catn("  rect2(", left, ",", top, ", w=", w, ", h=", 
                   h, ", ...)", sep = "")
             rect2(left, top, dx = w, dy = h, col = bg, density = NULL, 
-                lwd = box.lwd, lty = box.lty)
+                lwd = box.lwd, lty = box.lty, border = box.col)
         }
         xt <- left + xchar + xextra + (w0 * rep.int(0:(ncol - 
-            1), rep.int(n.legpercol, ncol)))[1:n.leg]
-        yt <- top - 0.5 * yextra - ymax - (rep.int(1:n.legpercol, 
-            ncol)[1:n.leg] - 1 + (!is.null(title))) * ychar
+            1), rep.int(n.legpercol, ncol)))[1L:n.leg]
+        yt <- top - 0.5 * yextra - ymax - (rep.int(1L:n.legpercol, 
+            ncol)[1L:n.leg] - 1 + (!is.null(title))) * ychar
         if (mfill) {
             if (plot) {
                 fill <- rep(fill, length.out = n.leg)
@@ -595,7 +555,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             pt.cex <- rep(pt.cex, length.out = n.leg)
             pt.lwd <- rep(pt.lwd, length.out = n.leg)
             ok <- !is.na(pch) & (is.character(pch) | pch >= 0)
-            x1 <- (if (merge) 
+            x1 <- (if (merge && do.lines) 
                 xt - (seg.len/2) * xchar
             else xt)[ok]
             y1 <- yt[ok]
@@ -605,31 +565,89 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             if (plot) 
                 points2(x1, y1, pch = pch[ok], col = col[ok], 
                   cex = pt.cex[ok], bg = pt.bg[ok], lwd = pt.lwd[ok])
-            if (!merge) 
-                xt <- xt + dx.pch
         }
         xt <- xt + x.intersp * xchar
         if (plot) {
             if (!is.null(title)) 
                 text2(left + w/2, top - ymax, labels = title, 
-                  adj = c(0.5, 0), cex = cex, col = text.col)
+                  adj = c(0.5, 0), cex = cex, col = title.col)
             text2(xt, yt, labels = legend, adj = adj, cex = cex, 
                 col = text.col)
         }
         invisible(list(rect = list(w = w, h = h, left = left, 
             top = top), text = list(x = xt, y = yt)))
     }
-    PythagorasDistance <- function(X, Y) {
-        n <- nrow(X)
-        m <- nrow(Y)
-        bx <- rowSums(X^2)
-        by <- rowSums(Y^2)
-        D <- matrix(bx, nrow = n, ncol = m) + matrix(by, nrow = n, 
-            ncol = m, byrow = TRUE) - 2 * X %*% t(Y)
-        if (identical(X, Y)) 
-            diag(D) <- 0
-        D^0.5
+    my.plot.tile.list <- function(x, verbose = FALSE, close = FALSE, 
+        pch = 1, polycol = NA, showpoints = TRUE, asp = 1, ...) {
+        object <- x
+        if (!inherits(object, "tile.list")) 
+            stop("Argument \"object\" is not of class tile.list.\n")
+        n <- length(object)
+        x.all <- unlist(lapply(object, function(w) {
+            c(w$pt[1], w$x)
+        }))
+        y.all <- unlist(lapply(object, function(w) {
+            c(w$pt[2], w$y)
+        }))
+        x.pts <- unlist(lapply(object, function(w) {
+            w$pt[1]
+        }))
+        y.pts <- unlist(lapply(object, function(w) {
+            w$pt[2]
+        }))
+        rx <- range(x.all)
+        ry <- range(y.all)
+        polycol <- apply(col2rgb(polycol, TRUE), 2, function(x) {
+            do.call(rgb, as.list(x/255))
+        })
+        polycol <- rep(polycol, length = length(object))
+        hexbla <- do.call(rgb, as.list(col2rgb("black", TRUE)/255))
+        hexwhi <- do.call(rgb, as.list(col2rgb("white", TRUE)/255))
+        ptcol <- ifelse(polycol == hexbla, hexwhi, hexbla)
+        lnwid <- ifelse(polycol == hexbla, 2, 1)
+        for (i in 1:n) {
+            inner <- !any(object[[i]]$bp)
+            if (close | inner) 
+                polygon(object[[i]], col = polycol[i], border = ptcol[i], 
+                  lwd = lnwid[i])
+            else {
+                x <- object[[i]]$x
+                y <- object[[i]]$y
+                bp <- object[[i]]$bp
+                ni <- length(x)
+                for (j in 1:ni) {
+                  jnext <- if (j < ni) 
+                    j + 1
+                  else 1
+                  do.it <- mid.in(x[c(j, jnext)], y[c(j, jnext)], 
+                    rx, ry)
+                  if (do.it) 
+                    segments(x[j], y[j], x[jnext], y[jnext], 
+                      col = ptcol[i], lwd = lnwid[i])
+                }
+            }
+            if (verbose & showpoints) 
+                points(object[[i]]$pt[1], object[[i]]$pt[2], 
+                  pch = pch, col = ptcol[i])
+            if (verbose & i < n) 
+                readline("Go? ")
+        }
+        if (showpoints) 
+            points(x.pts, y.pts, pch = pch, col = ptcol)
+        invisible()
     }
+    text2hex <- function(textcol) {
+        WhichSystemButtonFace <- which(textcol == "SystemButtonFace")
+        if (.Platform$OS.type == "unix") 
+            textcol[WhichSystemButtonFace] <- "white"
+        else textcol[WhichSystemButtonFace] <- NA
+        temp1 <- col2rgb(textcol)/256
+        temp2 <- rgb(temp1[1], temp1[2], temp1[3])
+        if (.Platform$OS.type == "windows") 
+            temp2[WhichSystemButtonFace] <- "SystemButtonFace"
+        temp2
+    }
+    tkchooseColor <- function(...) tcl("tk_chooseColor", ...)
     linebreak <- function(stringin = "", cutoff = 60) {
         stringin <- as.character(stringin)
         temp1 <- strsplit(stringin, c(" ", "-"))[[1]]
@@ -662,6 +680,24 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         .Tcl(paste("DynamicHelp::add ", widget, " -text \"", 
             temp3, "\"", sep = ""))
     }
+    SquareRootMatrix <- function(mat) {
+        temp1 <- svd(mat)
+        if (min(temp1$d) <= 0) 
+            stop("mat is required to be positive definite.")
+        temp2 <- temp1$u %*% diag(sqrt(temp1$d)) %*% t(temp1$u)
+        (temp2 + t(temp2))/2
+    }
+    PythagorasDistance <- function(X, Y) {
+        n <- nrow(X)
+        m <- nrow(Y)
+        bx <- rowSums(X^2)
+        by <- rowSums(Y^2)
+        D <- matrix(bx, nrow = n, ncol = m) + matrix(by, nrow = n, 
+            ncol = m, byrow = TRUE) - 2 * X %*% t(Y)
+        if (identical(X, Y)) 
+            diag(D) <- 0
+        D^0.5
+    }
     GUI.TopLevel <- tktoplevel()
     tkwm.title(GUI.TopLevel, "BiplotGUI")
     Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
@@ -692,10 +728,46 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GUI.ScreenWidth/2, 0), "+", round(GUI.AvailableScreenHeight/2 - 
             GUI.ScreenHeight/2, 0), sep = ""))
     .Tcl(paste("wm minsize ", GUI.TopLevel, " 900 600", sep = ""))
+    GUI.resize.allowed <- TRUE
+    GUI.resize.counter <- 0
+    tkbind(GUI.TopLevel, "<Destroy>", function() GUI.resize.allowed <<- FALSE)
+    GUI.resize.replot <- function() {
+        if (GUI.WindowWidth != (temp1 <- as.numeric(tkwinfo("width", 
+            GUI.TopLevel))) | GUI.WindowHeight != (temp2 <- as.numeric(tkwinfo("height", 
+            GUI.TopLevel)))) {
+            Biplot.replot()
+            CurrentTab <- tclvalue(tcl(DiagnosticTabs.nb, "index", 
+                "current"))
+            tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
+            tkselect(DiagnosticTabs.nb, 0)
+            ConvergenceTab.replot()
+            PointsTab.replot()
+            GroupsTab.replot()
+            AxesTab.replot()
+            PredictionsTab.place()
+            Kraal.replot()
+            tkselect(DiagnosticTabs.nb, CurrentTab)
+            if (tclvalue(Points.var) %in% c("10", "11", "12")) 
+                tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
+            else tcl(DiagnosticTabs.nb, "tab", 0, state = "disabled")
+            GUI.WindowWidth <<- temp1
+            GUI.WindowHeight <<- temp2
+        }
+        GUI.resize.counter <<- 0
+    }
+    GUI.resize <- function() {
+        if (GUI.resize.allowed) {
+            GUI.resize.counter <<- GUI.resize.counter + 1
+            temp1 <- .Tcl(paste("after 200 ", suppressWarnings(tclFun(GUI.resize.replot)), 
+                sep = ""))
+            if (GUI.resize.counter > 1) 
+                .Tcl(paste("after cancel ", temp1, sep = ""))
+        }
+    }
     GUI.BindingsOff <- function() {
         tkconfigure(GUI.TopLevel, cursor = "watch")
-        ControlButtons.ProgressBar.create()
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 0)
+        Other.ProgressBar.create()
+        tkconfigure(Other.ProgressBar.pb, value = 0)
         .Tcl("update")
         tkbind(GUI.TopLevel, "<Control-s>", function() NULL)
         tkbind(GUI.TopLevel, "<Control-S>", function() NULL)
@@ -714,6 +786,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkbind(GUI.TopLevel, "<Control-R>", function() NULL)
         tkbind(GUI.TopLevel, "a", function() NULL)
         tkbind(GUI.TopLevel, "A", function() NULL)
+        tkbind(GUI.TopLevel, "r", function() NULL)
+        tkbind(GUI.TopLevel, "R", function() NULL)
         tkbind(GUI.TopLevel, "b", function() NULL)
         tkbind(GUI.TopLevel, "B", function() NULL)
         tkbind(GUI.TopLevel, "c", function() NULL)
@@ -748,10 +822,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkbind(Kraal.image, "<ButtonRelease-1>", function() NULL)
         tkbind(Kraal.image, "<Button-3>", function() NULL)
     }
-    tkbind(GUI.TopLevel, "<Destroy>", function() GUI.resize.allowed <<- FALSE)
     GUI.BindingsOn <- function() {
         GUI.update()
-        tkbind(GUI.TopLevel, "<Escape>", ControlButtons.Stop.cmd)
+        tkbind(GUI.TopLevel, "<Escape>", Other.Stop.cmd)
         tkbind(GUI.TopLevel, "<Control-s>", function() File.Save.as.cmd())
         tkbind(GUI.TopLevel, "<Control-S>", function() File.Save.as.cmd())
         tkbind(GUI.TopLevel, "<Control-c>", function() tkinvoke(MenuBar.File, 
@@ -783,6 +856,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             2))
         tkbind(GUI.TopLevel, "A", function() tkinvoke(MenuBar.Points, 
             2))
+        tkbind(GUI.TopLevel, "r", function() tkinvoke(MenuBar.Points.MDS, 
+            0))
+        tkbind(GUI.TopLevel, "R", function() tkinvoke(MenuBar.Points.MDS, 
+            0))
         tkbind(GUI.TopLevel, "b", function() tkinvoke(MenuBar.Points.MDS, 
             2))
         tkbind(GUI.TopLevel, "B", function() tkinvoke(MenuBar.Points.MDS, 
@@ -824,9 +901,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkbind(BiplotRegion.image, "<Button-1>", Biplot.LeftClick)
         tkbind(BiplotRegion.image, "<ButtonRelease-1>", Biplot.LeftRelease)
         tkbind(BiplotRegion.image, "<Button-3>", Biplot.RightClick)
-        tkbind(GUI.TopLevel, "<F11>", function() tkinvoke(ControlButtons.External.menu, 
+        tkbind(GUI.TopLevel, "<F11>", function() tkinvoke(Other.External.menu, 
             0))
-        tkbind(GUI.TopLevel, "<F12>", function() tkinvoke(ControlButtons.External.menu, 
+        tkbind(GUI.TopLevel, "<F12>", function() tkinvoke(Other.External.menu, 
             1))
         tkbind(ConvergenceTab.image, "<Button-3>", ConvergenceTab.RightClick)
         tkbind(PointsTab.image, "<Button-3>", PointsTab.RightClick)
@@ -837,56 +914,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkbind(Kraal.image, "<ButtonRelease-1>", Kraal.LeftRelease)
         tkbind(Kraal.image, "<Button-3>", Kraal.RightClick)
         ExportTab.update()
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 100)
-        ControlButtons.ProgressBar.destroy()
+        tkconfigure(Other.ProgressBar.pb, value = 100)
+        Other.ProgressBar.destroy()
         tkconfigure(GUI.TopLevel, cursor = "arrow")
         .Tcl("update")
     }
-    GUI.SaveAs.what <- NULL
-    GUI.resize.allowed <- TRUE
-    GUI.resize.counter <- 0
-    GUI.resize.replot <- function() {
-        if (GUI.WindowWidth != (temp1 <- as.numeric(tkwinfo("width", 
-            GUI.TopLevel))) | GUI.WindowHeight != (temp2 <- as.numeric(tkwinfo("height", 
-            GUI.TopLevel)))) {
-            Biplot.replot()
-            CurrentTab <- tclvalue(tcl(DiagnosticTabs.nb, "index", 
-                "current"))
-            tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
-            tkselect(DiagnosticTabs.nb, 0)
-            ConvergenceTab.replot()
-            PointsTab.replot()
-            GroupsTab.replot()
-            AxesTab.replot()
-            PredictionsTab.place()
-            Kraal.replot()
-            tkselect(DiagnosticTabs.nb, CurrentTab)
-            if (tclvalue(Points.var) %in% c("10", "11", "12")) 
-                tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
-            else tcl(DiagnosticTabs.nb, "tab", 0, state = "disabled")
-            GUI.WindowWidth <<- temp1
-            GUI.WindowHeight <<- temp2
-        }
-        GUI.resize.counter <<- 0
-    }
-    GUI.resize <- function() {
-        if (GUI.resize.allowed) {
-            GUI.resize.counter <<- GUI.resize.counter + 1
-            temp1 <- .Tcl(paste("after 200 ", suppressWarnings(tclFun(GUI.resize.replot)), 
-                sep = ""))
-            if (GUI.resize.counter > 1) 
-                .Tcl(paste("after cancel ", temp1, sep = ""))
-        }
-    }
     GUI.update <- function() {
         if (tclvalue(Biplot.Axes.var) %in% c("0", "1", "2", "10", 
-            "11", "12") | tclvalue(ControlButtons.HideAxes.var) == 
-            "1") 
+            "11", "12") | tclvalue(Other.HideAxes.var) == "1") 
             tkentryconfigure(MenuBar.View, 3, state = "disabled")
         else tkentryconfigure(MenuBar.View, 3, state = "normal")
         for (temp1 in 2:3) tkentryconfigure(MenuBar.View, temp1, 
             variable = View.ClipAround.var)
-        if (tclvalue(ControlButtons.HidePoints.var) == "1") 
+        if (tclvalue(Other.HidePoints.var) == "1") 
             tkentryconfigure(MenuBar.View, 5, state = "disabled")
         else tkentryconfigure(MenuBar.View, 5, state = "normal")
         tkentryconfigure(MenuBar.View, 5, variable = View.ShowPointLabels.var)
@@ -895,12 +935,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         else tkentryconfigure(MenuBar.View, 6, state = "normal")
         tkentryconfigure(MenuBar.View, 6, variable = View.ShowPointValues.var)
         if (g > 1) {
-            if (tclvalue(ControlButtons.HidePoints.var) == "1") 
+            if (tclvalue(Other.HidePoints.var) == "1") 
                 tkentryconfigure(MenuBar.View, 8, state = "disabled")
             else tkentryconfigure(MenuBar.View, 8, state = "normal")
         }
         tkentryconfigure(MenuBar.View, 8, variable = View.ShowGroupLabelsInLegend.var)
-        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(ControlButtons.HideAxes.var) == 
+        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(Other.HideAxes.var) == 
             "1") 
             for (temp1 in c(10, 12)) {
                 tkentryconfigure(MenuBar.View, temp1, state = "disabled")
@@ -913,7 +953,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 5, state = "normal")
         }
         if (tclvalue(Biplot.Axes.var) %in% c("10", "13", "14") | 
-            tclvalue(ControlButtons.HideAxes.var) == "1") {
+            tclvalue(Other.HideAxes.var) == "1") {
             tkentryconfigure(MenuBar.View, 11, state = "disabled")
             tkentryconfigure(Biplot.RightClickOutside.Menu, 6, 
                 state = "disabled")
@@ -930,19 +970,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         for (temp1 in c(0:1, 3)) tkentryconfigure(MenuBar.Joint, 
             temp1, variable = Biplot.Axes.var)
+        if (tclvalue(Points.var) %in% c("10", "11", "12")) 
+            tkentryconfigure(MenuBar.Points.MDS, 0, state = "normal")
+        else tkentryconfigure(MenuBar.Points.MDS, 0, state = "disabled")
         if (tclvalue(Points.var) == "11") 
             for (temp1 in 6:7) tkentryconfigure(MenuBar.Points.MDS, 
                 temp1, state = "normal", variable = Points.MDS.ApproachToTies.var)
         else for (temp1 in 6:7) tkentryconfigure(MenuBar.Points.MDS, 
             temp1, state = "disabled", variable = Points.MDS.ApproachToTies.var)
-        if (tclvalue(Points.DistanceMetric.var) == "3" && tclvalue(Points.var) == 
-            "0") 
+        if (tclvalue(Points.DissimilarityMetric.var) == "3" && 
+            tclvalue(Points.var) == "0") 
             for (temp1 in 2:3) tkentryconfigure(MenuBar.Axes, 
                 temp1, state = "disabled")
         else for (temp1 in 2:3) tkentryconfigure(MenuBar.Axes, 
             temp1, state = "normal")
-        if ((tclvalue(Points.DistanceMetric.var) == "3" && tclvalue(Points.var) == 
-            "0") || tclvalue(Points.var) %in% c("10", "11", "12")) 
+        if ((tclvalue(Points.DissimilarityMetric.var) == "3" && 
+            tclvalue(Points.var) == "0") || tclvalue(Points.var) %in% 
+            c("10", "11", "12")) 
             for (temp1 in 5) tkentryconfigure(MenuBar.Axes, temp1, 
                 state = "disabled")
         else for (temp1 in 5) tkentryconfigure(MenuBar.Axes, 
@@ -963,14 +1007,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkentryconfigure(MenuBar.Additional, 3, variable = Additional.AlphaBag.var)
         tkentryconfigure(MenuBar.Additional, 5, variable = Additional.PointDensities.var)
         tkentryconfigure(MenuBar.Additional, 6, variable = Additional.ClassificationRegion.var)
-        if (tclvalue(ControlButtons.HideAxes.var) == "1" || tclvalue(tkget(SettingsBox.action.combo)) != 
+        if (tclvalue(Other.HideAxes.var) == "1" || tclvalue(tkget(SettingsBox.action.combo)) != 
             "Predict") 
             tkentryconfigure(Biplot.RightClickInside.Menu, 5, 
                 state = "disabled")
         else tkentryconfigure(Biplot.RightClickInside.Menu, 5, 
             state = "normal")
-        if (tclvalue(ControlButtons.HidePoints.var) == "1" || 
-            tclvalue(ControlButtons.HideAxes.var) == "1" || tclvalue(tkget(SettingsBox.action.combo)) != 
+        if (tclvalue(Other.HidePoints.var) == "1" || tclvalue(Other.HideAxes.var) == 
+            "1" || tclvalue(tkget(SettingsBox.action.combo)) != 
             "Predict") 
             tkentryconfigure(Biplot.RightClickInside.Menu, 6, 
                 state = "disabled")
@@ -983,16 +1027,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 state = "disabled")
         else tkentryconfigure(Biplot.RightClickInside.Menu, 8, 
             state = "normal")
-        if (tclvalue(Biplot.Axes.var) == "10") 
-            tkentryconfigure(ControlButtons.Hide.menu, 1, state = "disabled")
-        else tkentryconfigure(ControlButtons.Hide.menu, 1, state = "normal")
-        if (as.numeric(tclvalue(Biplot.Axes.var)) >= 10 && as.numeric(tclvalue(Points.var)) >= 
-            10) 
-            tkentryconfigure(ControlButtons.External.menu, 1, 
-                state = "disabled")
-        else tkentryconfigure(ControlButtons.External.menu, 1, 
-            state = "normal")
-        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(ControlButtons.HideAxes.var) == 
+        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(Other.HideAxes.var) == 
             "1") 
             tkconfigure(SettingsBox.action.combo, state = "disabled")
         else tkconfigure(SettingsBox.action.combo, state = "normal")
@@ -1000,15 +1035,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             c("10", "11", "12")) 
             tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
         else tcl(DiagnosticTabs.nb, "tab", 0, state = "disabled")
-        switch(tclvalue(Biplot.Axes.var), "0" = {
+        switch(tclvalue(Biplot.Axes.var), `0` = {
             tcl(DiagnosticTabs.nb, "tab", 1, state = "normal")
             tcl(DiagnosticTabs.nb, "tab", 2, state = "disabled")
             tcl(DiagnosticTabs.nb, "tab", 3, state = "normal")
-        }, "1" = {
+        }, `1` = {
             tcl(DiagnosticTabs.nb, "tab", 1, state = "disabled")
             tcl(DiagnosticTabs.nb, "tab", 2, state = "disabled")
             tcl(DiagnosticTabs.nb, "tab", 3, state = "disabled")
-        }, "2" = {
+        }, `2` = {
             tcl(DiagnosticTabs.nb, "tab", 1, state = "normal")
             tcl(DiagnosticTabs.nb, "tab", 2, state = "normal")
             tcl(DiagnosticTabs.nb, "tab", 3, state = "normal")
@@ -1017,28 +1052,36 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tcl(DiagnosticTabs.nb, "tab", 2, state = "disabled")
             tcl(DiagnosticTabs.nb, "tab", 3, state = "disabled")
         })
-        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(ControlButtons.HideAxes.var) == 
+        if (tclvalue(Biplot.Axes.var) == "10" | tclvalue(Other.HideAxes.var) == 
             "1" | !tclvalue(tkget(SettingsBox.action.combo)) == 
             "Predict") 
             tcl(DiagnosticTabs.nb, "tab", 4, state = "disabled")
         else tcl(DiagnosticTabs.nb, "tab", 4, state = "normal")
+        if (tclvalue(Biplot.Axes.var) == "10") 
+            tkentryconfigure(Other.Hide.menu, 1, state = "disabled")
+        else tkentryconfigure(Other.Hide.menu, 1, state = "normal")
+        if (as.numeric(tclvalue(Biplot.Axes.var)) >= 10 && as.numeric(tclvalue(Points.var)) >= 
+            10) 
+            tkentryconfigure(Other.External.menu, 1, state = "disabled")
+        else tkentryconfigure(Other.External.menu, 1, state = "normal")
     }
     File.Save.as.cmd <- function() {
         GUI.BindingsOff()
-        switch(tclvalue(File.SaveAs.var), "0" = File.SaveAs.PDF.cmd(), 
-            "1" = File.SaveAs.Postscript.cmd(), "2" = File.SaveAs.Metafile.cmd(), 
-            "3" = File.SaveAs.Bmp.cmd(), "4" = File.SaveAs.Png.cmd(), 
-            "5" = File.SaveAs.Jpeg.cmd(), "6" = File.SaveAs.Jpeg.cmd(), 
-            "7" = File.SaveAs.Jpeg.cmd(), "8" = File.SaveAs.PicTeX.cmd())
+        switch(tclvalue(File.SaveAs.var), `0` = File.SaveAs.PDF.cmd(), 
+            `1` = File.SaveAs.Postscript.cmd(), `2` = File.SaveAs.Metafile.cmd(), 
+            `3` = File.SaveAs.Bmp.cmd(), `4` = File.SaveAs.Png.cmd(), 
+            `5` = File.SaveAs.Jpeg.cmd(), `6` = File.SaveAs.Jpeg.cmd(), 
+            `7` = File.SaveAs.Jpeg.cmd(), `8` = File.SaveAs.PicTeX.cmd())
         GUI.BindingsOn()
     }
+    File.SaveAs.var <- tclVar("0")
     File.SaveAs.PDF.cmd <- function() {
         FileName <- tclvalue(tkgetSaveFile(filetypes = "{{PDF files} {.pdf}} {{All files} *}"))
         if (nchar(FileName)) {
             nn <- nchar(FileName)
             if (nn < 5 || substr(FileName, nn - 3, nn) != ".pdf") 
                 FileName <- paste(FileName, ".pdf", sep = "")
-            pdf(FileName, width = 8, height = 8)
+            pdf(FileName, width = 7, height = 7)
             Biplot.plot(screen = FALSE)
             dev.off()
         }
@@ -1096,7 +1139,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         tkfocus(GUI.TopLevel)
     }
-    File.Jpeg.quality <- NULL
     File.SaveAs.Jpeg.cmd <- function() {
         FileName <- tclvalue(tkgetSaveFile(filetypes = "{{Jpeg files} {.jpg .jpeg}} {{All files} *}"))
         if (nchar(FileName)) {
@@ -1110,6 +1152,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         tkfocus(GUI.TopLevel)
     }
+    File.Jpeg.quality <- NULL
     File.SaveAs.PicTeX.cmd <- function() {
         FileName <- tclvalue(tkgetSaveFile(filetypes = "{{TeX files} {.tex}} {{All files} *}"))
         if (nchar(FileName)) {
@@ -1123,7 +1166,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         tkfocus(GUI.TopLevel)
     }
-    File.SaveAs.var <- tclVar("0")
     File.Copy.cmd <- function() {
         win.metafile(width = 8, height = 8, restoreConsole = FALSE)
         Biplot.plot(screen = FALSE)
@@ -1153,7 +1195,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 tkconfigure(entry5, textvariable = local.IterationsToLiveUpdate.var)
                 local.ReuseExternalWindows.var <<- tclVar(FALSE)
                 tkconfigure(checkbutton1, variable = local.ReuseExternalWindows.var)
-                local.ThreeDFlyBy.var <<- tclVar(TRUE)
+                local.ThreeDFlyBy.var <<- tclVar(FALSE)
                 tkconfigure(checkbutton2, variable = local.ThreeDFlyBy.var)
                 local.ThreeDMouseButtonActionLeft.var <<- tclVar("trackball")
                 tkconfigure(combo1, text = "trackball")
@@ -1174,9 +1216,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   tclvalue(tkget(combo2)), tclvalue(tkget(combo3)))
                 tkdestroy(top)
             }
-            onCancel <- function() {
-                tkdestroy(top)
-            }
+            onCancel <- function() tkdestroy(top)
             local.MDSConvergence.var <- tclVar(boptions$MDS.convergence)
             local.MDSMaximumIterations.var <- tclVar(boptions$MDS.MaximumIterations)
             local.ProcrustesConvergence.var <- tclVar(boptions$Procrustes.convergence)
@@ -1189,72 +1229,72 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             local.ThreeDMouseButtonActionRight.var <- tclVar(boptions$ThreeD.MouseButtonAction[3])
             frame1 <- tkwidget(top, "TitleFrame", text = "Convergence")
             tkplace(frame1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 105, "in" = top)
+                height = 105, `in` = top)
             tkplace(tk2label(frame1, text = "MDS relative convergence"), 
-                x = 11, y = 20, "in" = frame1)
+                x = 11, y = 20, `in` = frame1)
             entry1 <- tk2entry(frame1, textvariable = local.MDSConvergence.var, 
                 justify = "right", takefocus = FALSE)
             tkplace(entry1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frame1, anchor = "ne")
+                relwidth = 0.125, `in` = frame1, anchor = "ne")
             tkplace(tk2label(frame1, text = "MDS maximum iterations"), 
-                x = 11, y = 40, "in" = frame1)
+                x = 11, y = 40, `in` = frame1)
             entry2 <- tk2entry(frame1, textvariable = local.MDSMaximumIterations.var, 
                 justify = "right", takefocus = FALSE)
             tkplace(entry2, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frame1, anchor = "ne")
+                relwidth = 0.125, `in` = frame1, anchor = "ne")
             tkplace(tk2label(frame1, text = "Procrustes absolute convergence"), 
-                x = 11, y = 60, "in" = frame1)
+                x = 11, y = 60, `in` = frame1)
             entry3 <- tk2entry(frame1, textvariable = local.ProcrustesConvergence.var, 
                 justify = "right", takefocus = FALSE)
             tkplace(entry3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frame1, anchor = "ne")
+                relwidth = 0.125, `in` = frame1, anchor = "ne")
             tkplace(tk2label(frame1, text = "Procrustes maximum iterations"), 
-                x = 11, y = 80, "in" = frame1)
+                x = 11, y = 80, `in` = frame1)
             entry4 <- tk2entry(frame1, textvariable = local.ProcrustesMaximumIterations.var, 
                 justify = "right", takefocus = FALSE)
             tkplace(entry4, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frame1, anchor = "ne")
+                relwidth = 0.125, `in` = frame1, anchor = "ne")
             frame2 <- tkwidget(top, "TitleFrame", text = "Graphical")
             tkplace(frame2, relx = 0.05, relwidth = 0.9, y = 130, 
-                height = 125, "in" = top)
+                height = 125, `in` = top)
             tkplace(tk2label(frame2, text = "Iterations to live update"), 
-                x = 11, y = 20, "in" = frame2)
+                x = 11, y = 20, `in` = frame2)
             entry5 <- tk2entry(frame2, textvariable = local.IterationsToLiveUpdate.var, 
                 justify = "right", takefocus = FALSE)
             tkplace(entry5, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frame2, anchor = "ne")
+                relwidth = 0.125, `in` = frame2, anchor = "ne")
             tkplace(tk2label(frame2, text = "Re-use external windows"), 
-                x = 11, y = 40, "in" = frame2)
+                x = 11, y = 40, `in` = frame2)
             checkbutton1 <- tk2checkbutton(frame2, variable = local.ReuseExternalWindows.var)
             tkplace(checkbutton1, relx = 0.9, y = 40, height = 17, 
-                "in" = frame2)
+                `in` = frame2)
             tkplace(tk2label(frame2, text = "Three-dimensional `fly-by'"), 
-                x = 11, y = 60, "in" = frame2)
+                x = 11, y = 60, `in` = frame2)
             checkbutton2 <- tk2checkbutton(frame2, variable = local.ThreeDFlyBy.var)
             tkplace(checkbutton2, relx = 0.9, y = 60, height = 17, 
-                "in" = frame2)
+                `in` = frame2)
             tkplace(tk2label(frame2, text = "Three-dimensional mouse button action:"), 
-                x = 11, y = 80, "in" = frame2)
+                x = 11, y = 80, `in` = frame2)
             MousePossibilities <- c("none", "trackball", "xAxis", 
                 "yAxis", "zAxis", "polar", "zoom", "fov")
             tkplace(tk2label(frame2, text = "Left"), x = 11, 
-                y = 100, "in" = frame2)
+                y = 100, `in` = frame2)
             combo1 <- tkwidget(frame2, "ComboBox", editable = FALSE, 
                 values = MousePossibilities, text = boptions$ThreeD.MouseButtonAction[1])
             tkplace(combo1, relx = 0.11, y = 100, relwidth = 0.2, 
-                height = 17, "in" = frame2)
+                height = 17, `in` = frame2)
             tkplace(tk2label(frame2, text = "Middle"), relx = 0.33, 
-                y = 100, "in" = frame2)
+                y = 100, `in` = frame2)
             combo2 <- tkwidget(frame2, "ComboBox", editable = FALSE, 
                 values = MousePossibilities, text = boptions$ThreeD.MouseButtonAction[2])
             tkplace(combo2, relx = 0.44, y = 100, relwidth = 0.2, 
-                height = 17, "in" = frame2)
+                height = 17, `in` = frame2)
             tkplace(tk2label(frame2, text = "Right"), relx = 0.66, 
-                y = 100, "in" = frame2)
+                y = 100, `in` = frame2)
             combo3 <- tkwidget(frame2, "ComboBox", editable = FALSE, 
                 values = MousePossibilities, text = boptions$ThreeD.MouseButtonAction[3])
             tkplace(combo3, relx = 0.755, y = 100, relwidth = 0.2, 
-                height = 17, "in" = frame2)
+                height = 17, `in` = frame2)
             button1 <- tk2button(top, text = "Defaults", width = 10, 
                 command = onDefaults)
             button2 <- tk2button(top, text = "OK", width = 10, 
@@ -1338,14 +1378,30 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.replot()
     }
     View.ShowAdditionalLabelsInLegend.var <- tclVar("1")
-    View.ShowDisplaySpaceAxes.cmd <- function() {
+    View.ShowNextLegendEntries.cmd <- function() {
+        if (Legend.CurrentPage < Legend.LastPage) {
+            Legend.CurrentPage <<- Legend.CurrentPage + 1
+            Biplot.replot()
+        }
+    }
+    View.ShowPreviousLegendEntries.cmd <- function() {
+        if (Legend.CurrentPage > 1) {
+            Legend.CurrentPage <<- Legend.CurrentPage - 1
+            Biplot.replot()
+        }
+    }
+    View.CalibrateDisplaySpaceAxes.cmd <- function() {
         Biplot.replot()
     }
-    View.ShowDisplaySpaceAxes.var <- tclVar("0")
+    View.CalibrateDisplaySpaceAxes.var <- tclVar("0")
     Format.Title.cmd <- function() {
         local.GUI.func <- function() {
             top <- tktoplevel()
             tkwm.withdraw(top)
+            onDefault <- function() {
+                NewTitle <<- tclVar(Biplot.title.default)
+                tkconfigure(entry1, textvariable = NewTitle)
+            }
             onOK <- function() {
                 tkdestroy(top)
                 if (Biplot.title != tclvalue(NewTitle)) {
@@ -1354,13 +1410,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             }
             onCancel <- function() tkdestroy(top)
-            onDefault <- function() {
-                NewTitle <<- tclVar(Biplot.title.default)
-                tkconfigure(entry1, textvariable = NewTitle)
-            }
+            NewTitle <- tclVar(Biplot.title)
             frame1 <- tk2frame(top, relief = "groove", borderwidth = "1.5p")
             label1 <- tk2label(frame1, text = "New title")
-            NewTitle <- tclVar(Biplot.title)
             entry1 <- tk2entry(frame1, textvariable = NewTitle)
             button1 <- tk2button(top, text = "OK", width = 10, 
                 command = onOK)
@@ -1370,10 +1422,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onDefault)
             tkplace(frame1, relx = 0.5, rely = 0.4, relwidth = 0.9, 
                 relheight = 0.4, anchor = "center")
-            tkplace(label1, relx = 0.05, rely = 0.5, "in" = frame1, 
+            tkplace(label1, relx = 0.05, rely = 0.5, `in` = frame1, 
                 anchor = "w")
             tkplace(entry1, relx = 0.5, rely = 0.5, relwidth = 0.45, 
-                "in" = frame1, anchor = "w")
+                `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.7, rely = 0.85, anchor = "e")
             tkplace(button2, relx = 0.95, rely = 0.85, anchor = "e")
             tkplace(button3, relx = 0.05, rely = 0.85, anchor = "w")
@@ -1616,6 +1668,77 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 else text2hex("SystemButtonFace")
                 tkconfigure(labelD1, background = local.ClassificationRegion.col.bg.var[[WhichGroup]])
             }
+            onDefaults <- function() {
+                bpar.initialise1.func()
+                initialise()
+                ChangeGroup()
+            }
+            onOK <- function() {
+                UpdateEntryBoxes()
+                bpar$gpoints.pch <<- as.numeric(lapply(local.points.pch.var[-1], 
+                  tclvalue))
+                bpar$gpoints.cex <<- as.numeric(lapply(local.points.cex.var[-1], 
+                  tclvalue))
+                bpar$gpoints.col.fg <<- unlist(local.points.col.fg.var[-1])
+                bpar$gpoints.col.bg <<- unlist(local.points.col.bg.var[-1])
+                bpar$gpoints.label.font <<- as.numeric(lapply(local.points.label.font.var[-1], 
+                  tclvalue))
+                bpar$gpoints.label.cex <<- as.numeric(lapply(local.points.label.cex.var[-1], 
+                  tclvalue))
+                bpar$gpoints.label.col <<- unlist(local.points.label.col.var[-1])
+                bpar$gpoints.label.HorizOffset <<- as.numeric(lapply(local.points.label.HorizOffset.var[-1], 
+                  tclvalue))
+                bpar$gpoints.label.VertOffset <<- as.numeric(lapply(local.points.label.VertOffset.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.pch <<- as.numeric(lapply(local.SampleGroupMeans.pch.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.cex <<- as.numeric(lapply(local.SampleGroupMeans.cex.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.col.fg <<- unlist(local.SampleGroupMeans.col.fg.var[-1])
+                bpar$gSampleGroupMeans.col.bg <<- unlist(local.SampleGroupMeans.col.bg.var[-1])
+                bpar$gSampleGroupMeans.label.font <<- as.numeric(lapply(local.SampleGroupMeans.label.font.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.label.cex <<- as.numeric(lapply(local.SampleGroupMeans.label.cex.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.label.col <<- unlist(local.SampleGroupMeans.label.col.var[-1])
+                bpar$gSampleGroupMeans.label.HorizOffset <<- as.numeric(lapply(local.SampleGroupMeans.label.HorizOffset.var[-1], 
+                  tclvalue))
+                bpar$gSampleGroupMeans.label.VertOffset <<- as.numeric(lapply(local.SampleGroupMeans.label.VertOffset.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.lty <<- as.numeric(lapply(local.ConvexHullAlphaBag.lty.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.lwd <<- as.numeric(lapply(local.ConvexHullAlphaBag.lwd.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.col.fg <<- unlist(local.ConvexHullAlphaBag.col.fg.var[-1])
+                bpar$gConvexHullAlphaBag.col.bg <<- unlist(local.ConvexHullAlphaBag.col.bg.var[-1])
+                bpar$gConvexHullAlphaBag.TukeyMedian.pch <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.pch.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.TukeyMedian.cex <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.cex.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.TukeyMedian.col.fg <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.col.fg.var[-1])
+                bpar$gConvexHullAlphaBag.TukeyMedian.col.bg <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.col.bg.var[-1])
+                bpar$gConvexHullAlphaBag.TukeyMedian.label.font <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.font.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.TukeyMedian.label.cex <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.cex.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.TukeyMedian.label.col <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.label.col.var[-1])
+                bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.HorizOffset.var[-1], 
+                  tclvalue))
+                bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.VertOffset.var[-1], 
+                  tclvalue))
+                bpar$gClassificationRegion.col.bg <<- unlist(local.ClassificationRegion.col.bg.var[-1])
+                bparp.func()
+                if (WhichTabInitially == 1) 
+                  Biplot.replot()
+                if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
+                  PointsTab.predictivities.replot()
+                if (tclvalue(Biplot.Axes.var) == "2") 
+                  GroupsTab.replot()
+                if (n.in < n) 
+                  Kraal.replot()
+                tkdestroy(top)
+            }
+            onCancel <- function() tkdestroy(top)
             local.points.pch.var <- NULL
             local.points.cex.var <- NULL
             local.points.col.fg.var <- NULL
@@ -1783,76 +1906,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   text2hex)
             }
             initialise()
-            onOK <- function() {
-                UpdateEntryBoxes()
-                bpar$gpoints.pch <<- as.numeric(lapply(local.points.pch.var[-1], 
-                  tclvalue))
-                bpar$gpoints.cex <<- as.numeric(lapply(local.points.cex.var[-1], 
-                  tclvalue))
-                bpar$gpoints.col.fg <<- unlist(local.points.col.fg.var[-1])
-                bpar$gpoints.col.bg <<- unlist(local.points.col.bg.var[-1])
-                bpar$gpoints.label.font <<- as.numeric(lapply(local.points.label.font.var[-1], 
-                  tclvalue))
-                bpar$gpoints.label.cex <<- as.numeric(lapply(local.points.label.cex.var[-1], 
-                  tclvalue))
-                bpar$gpoints.label.col <<- unlist(local.points.label.col.var[-1])
-                bpar$gpoints.label.HorizOffset <<- as.numeric(lapply(local.points.label.HorizOffset.var[-1], 
-                  tclvalue))
-                bpar$gpoints.label.VertOffset <<- as.numeric(lapply(local.points.label.VertOffset.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.pch <<- as.numeric(lapply(local.SampleGroupMeans.pch.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.cex <<- as.numeric(lapply(local.SampleGroupMeans.cex.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.col.fg <<- unlist(local.SampleGroupMeans.col.fg.var[-1])
-                bpar$gSampleGroupMeans.col.bg <<- unlist(local.SampleGroupMeans.col.bg.var[-1])
-                bpar$gSampleGroupMeans.label.font <<- as.numeric(lapply(local.SampleGroupMeans.label.font.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.label.cex <<- as.numeric(lapply(local.SampleGroupMeans.label.cex.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.label.col <<- unlist(local.SampleGroupMeans.label.col.var[-1])
-                bpar$gSampleGroupMeans.label.HorizOffset <<- as.numeric(lapply(local.SampleGroupMeans.label.HorizOffset.var[-1], 
-                  tclvalue))
-                bpar$gSampleGroupMeans.label.VertOffset <<- as.numeric(lapply(local.SampleGroupMeans.label.VertOffset.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.lty <<- as.numeric(lapply(local.ConvexHullAlphaBag.lty.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.lwd <<- as.numeric(lapply(local.ConvexHullAlphaBag.lwd.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.col.fg <<- unlist(local.ConvexHullAlphaBag.col.fg.var[-1])
-                bpar$gConvexHullAlphaBag.col.bg <<- unlist(local.ConvexHullAlphaBag.col.bg.var[-1])
-                bpar$gConvexHullAlphaBag.TukeyMedian.pch <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.pch.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.TukeyMedian.cex <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.cex.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.TukeyMedian.col.fg <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.col.fg.var[-1])
-                bpar$gConvexHullAlphaBag.TukeyMedian.col.bg <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.col.bg.var[-1])
-                bpar$gConvexHullAlphaBag.TukeyMedian.label.font <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.font.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.TukeyMedian.label.cex <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.cex.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.TukeyMedian.label.col <<- unlist(local.ConvexHullAlphaBag.TukeyMedian.label.col.var[-1])
-                bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.HorizOffset.var[-1], 
-                  tclvalue))
-                bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset <<- as.numeric(lapply(local.ConvexHullAlphaBag.TukeyMedian.label.VertOffset.var[-1], 
-                  tclvalue))
-                bpar$gClassificationRegion.col.bg <<- unlist(local.ClassificationRegion.col.bg.var[-1])
-                bparp.func()
-                Biplot.replot()
-                if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
-                  PointsTab.predictivities.replot()
-                if (tclvalue(Biplot.Axes.var) == "2") 
-                  GroupsTab.replot()
-                if (n.in < n) 
-                  Kraal.replot()
-                tkdestroy(top)
-            }
-            onCancel <- function() tkdestroy(top)
-            onDefaults <- function() {
-                bpar.initialise1.func()
-                initialise()
-                ChangeGroup()
-            }
             listbox1 <- tkwidget(top, "listbox", bg = "white", 
                 relief = "groove", borderwidth = "1.5p", yscrollcommand = function(...) tkset(listbox1.scry, 
                   ...))
@@ -1868,9 +1921,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkadd(notebook, notebook.A, text = "Points")
             frameA1 <- tkwidget(notebook.A, "TitleFrame", text = "Plotting character")
             tkplace(frameA1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 105, "in" = notebook.A)
+                height = 105, `in` = notebook.A)
             tkplace(tk2label(frameA1, text = "Symbol"), x = 11, 
-                y = 20, "in" = frameA1)
+                y = 20, `in` = frameA1)
             spinboxA1 <- tkwidget(frameA1, "SpinBox", textvariable = local.points.pch.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", "NA", 0:25), 
                 justify = "right", modifycmd = function() {
@@ -1879,19 +1932,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.points.pch.var[[temp1]] <<- tclVar(tclvalue(local.points.pch.var[[1]]))
                 })
             tkplace(spinboxA1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkplace(tk2label(frameA1, text = "Size"), x = 11, 
-                y = 40, "in" = frameA1)
+                y = 40, `in` = frameA1)
             entryA1 <- tk2entry(frameA1, textvariable = local.points.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA1, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkplace(tk2label(frameA1, text = "Foreground colour"), 
-                x = 11, y = 60, "in" = frameA1)
+                x = 11, y = 60, `in` = frameA1)
             labelA1 <- tklabel(frameA1, background = local.points.col.fg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA1, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkbind(labelA1, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.points.col.fg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -1903,11 +1956,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameA1, text = "Background colour"), 
-                x = 11, y = 80, "in" = frameA1)
+                x = 11, y = 80, `in` = frameA1)
             labelA2 <- tklabel(frameA1, background = local.points.col.bg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA2, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkbind(labelA2, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.points.col.bg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -1920,9 +1973,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })
             frameA2 <- tkwidget(notebook.A, "TitleFrame", text = "Label")
             tkplace(frameA2, relx = 0.05, relwidth = 0.9, y = 130, 
-                height = 125, "in" = notebook.A)
+                height = 125, `in` = notebook.A)
             tkplace(tk2label(frameA2, text = "Font"), x = 11, 
-                y = 20, "in" = frameA2)
+                y = 20, `in` = frameA2)
             spinboxA2 <- tkwidget(frameA2, "SpinBox", textvariable = local.points.label.font.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", 1:4), justify = "right", 
                 modifycmd = function() {
@@ -1931,19 +1984,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.points.label.font.var[[temp1]] <<- tclVar(tclvalue(local.points.label.font.var[[1]]))
                 })
             tkplace(spinboxA2, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Size"), x = 11, 
-                y = 40, "in" = frameA2)
+                y = 40, `in` = frameA2)
             entryA2 <- tk2entry(frameA2, textvariable = local.points.label.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA2, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Colour"), x = 11, 
-                y = 60, "in" = frameA2)
+                y = 60, `in` = frameA2)
             labelA3 <- tklabel(frameA2, background = local.points.label.col.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkbind(labelA3, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.points.label.col.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -1955,24 +2008,24 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameA2, text = "Horizontal offset"), 
-                x = 11, y = 80, "in" = frameA2)
+                x = 11, y = 80, `in` = frameA2)
             entryA3 <- tk2entry(frameA2, textvariable = local.points.label.HorizOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA3, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Vertical offset"), 
-                x = 11, y = 100, "in" = frameA2)
+                x = 11, y = 100, `in` = frameA2)
             entryA4 <- tk2entry(frameA2, textvariable = local.points.label.VertOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA4, relx = 0.95, y = 100, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             notebook.B <- tk2frame(notebook)
             tkadd(notebook, notebook.B, text = "Sample group means")
             frameB1 <- tkwidget(notebook.B, "TitleFrame", text = "Plotting character")
             tkplace(frameB1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 105, "in" = notebook.B)
+                height = 105, `in` = notebook.B)
             tkplace(tk2label(frameB1, text = "Symbol"), x = 11, 
-                y = 20, "in" = frameB1)
+                y = 20, `in` = frameB1)
             spinboxB1 <- tkwidget(frameB1, "SpinBox", textvariable = local.SampleGroupMeans.pch.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", "NA", 0:25), 
                 justify = "right", modifycmd = function() {
@@ -1981,19 +2034,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.SampleGroupMeans.pch.var[[temp1]] <<- tclVar(tclvalue(local.SampleGroupMeans.pch.var[[1]]))
                 })
             tkplace(spinboxB1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameB1, anchor = "ne")
+                relwidth = 0.125, `in` = frameB1, anchor = "ne")
             tkplace(tk2label(frameB1, text = "Size"), x = 11, 
-                y = 40, "in" = frameB1)
+                y = 40, `in` = frameB1)
             entryB1 <- tk2entry(frameB1, textvariable = local.SampleGroupMeans.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryB1, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameB1, anchor = "ne")
+                relwidth = 0.125, `in` = frameB1, anchor = "ne")
             tkplace(tk2label(frameB1, text = "Foreground colour"), 
-                x = 11, y = 60, "in" = frameB1)
+                x = 11, y = 60, `in` = frameB1)
             labelB1 <- tklabel(frameB1, background = local.SampleGroupMeans.col.fg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelB1, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameB1, anchor = "ne")
+                relwidth = 0.125, `in` = frameB1, anchor = "ne")
             tkbind(labelB1, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.SampleGroupMeans.col.fg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2005,11 +2058,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameB1, text = "Background colour"), 
-                x = 11, y = 80, "in" = frameB1)
+                x = 11, y = 80, `in` = frameB1)
             labelB2 <- tklabel(frameB1, background = local.SampleGroupMeans.col.bg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelB2, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameB1, anchor = "ne")
+                relwidth = 0.125, `in` = frameB1, anchor = "ne")
             tkbind(labelB2, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.SampleGroupMeans.col.bg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2022,9 +2075,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })
             frameB2 <- tkwidget(notebook.B, "TitleFrame", text = "Label")
             tkplace(frameB2, relx = 0.05, relwidth = 0.9, y = 130, 
-                height = 125, "in" = notebook.B)
+                height = 125, `in` = notebook.B)
             tkplace(tk2label(frameB2, text = "Font"), x = 11, 
-                y = 20, "in" = frameB2)
+                y = 20, `in` = frameB2)
             spinboxB2 <- tkwidget(frameB2, "SpinBox", textvariable = local.SampleGroupMeans.label.font.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", 1:4), justify = "right", 
                 modifycmd = function() {
@@ -2033,19 +2086,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.SampleGroupMeans.label.font.var[[temp1]] <<- tclVar(tclvalue(local.SampleGroupMeans.label.font.var[[1]]))
                 })
             tkplace(spinboxB2, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameB2, anchor = "ne")
+                relwidth = 0.125, `in` = frameB2, anchor = "ne")
             tkplace(tk2label(frameB2, text = "Size"), x = 11, 
-                y = 40, "in" = frameB2)
+                y = 40, `in` = frameB2)
             entryB2 <- tk2entry(frameB2, textvariable = local.SampleGroupMeans.label.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryB2, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameB2, anchor = "ne")
+                relwidth = 0.125, `in` = frameB2, anchor = "ne")
             tkplace(tk2label(frameB2, text = "Colour"), x = 11, 
-                y = 60, "in" = frameB2)
+                y = 60, `in` = frameB2)
             labelB3 <- tklabel(frameB2, background = local.SampleGroupMeans.label.col.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelB3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameB2, anchor = "ne")
+                relwidth = 0.125, `in` = frameB2, anchor = "ne")
             tkbind(labelB3, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.SampleGroupMeans.label.col.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2057,24 +2110,24 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameB2, text = "Horizontal offset"), 
-                x = 11, y = 80, "in" = frameB2)
+                x = 11, y = 80, `in` = frameB2)
             entryB3 <- tk2entry(frameB2, textvariable = local.SampleGroupMeans.label.HorizOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryB3, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameB2, anchor = "ne")
+                relwidth = 0.125, `in` = frameB2, anchor = "ne")
             tkplace(tk2label(frameB2, text = "Vertical offset"), 
-                x = 11, y = 100, "in" = frameB2)
+                x = 11, y = 100, `in` = frameB2)
             entryB4 <- tk2entry(frameB2, textvariable = local.SampleGroupMeans.label.VertOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryB4, relx = 0.95, y = 100, height = 18, 
-                relwidth = 0.125, "in" = frameB2, anchor = "ne")
+                relwidth = 0.125, `in` = frameB2, anchor = "ne")
             notebook.C <- tk2frame(notebook)
             tkadd(notebook, notebook.C, text = "Convex hulls / Alpha-bags")
             frameC1 <- tkwidget(notebook.C, "TitleFrame", text = "Region")
             tkplace(frameC1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 105, "in" = notebook.C)
+                height = 105, `in` = notebook.C)
             tkplace(tk2label(frameC1, text = "Line type"), x = 11, 
-                y = 20, "in" = frameC1)
+                y = 20, `in` = frameC1)
             spinboxC1 <- tkwidget(frameC1, "SpinBox", textvariable = local.ConvexHullAlphaBag.lty.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", 0:6), justify = "right", 
                 modifycmd = function() {
@@ -2083,19 +2136,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.ConvexHullAlphaBag.lty.var[[temp1]] <<- tclVar(tclvalue(local.ConvexHullAlphaBag.lty.var[[1]]))
                 })
             tkplace(spinboxC1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameC1, anchor = "ne")
+                relwidth = 0.125, `in` = frameC1, anchor = "ne")
             tkplace(tk2label(frameC1, text = "Line width"), x = 11, 
-                y = 40, "in" = frameC1)
+                y = 40, `in` = frameC1)
             entryC1 <- tk2entry(frameC1, textvariable = local.ConvexHullAlphaBag.lwd.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryC1, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameC1, anchor = "ne")
+                relwidth = 0.125, `in` = frameC1, anchor = "ne")
             tkplace(tk2label(frameC1, text = "Foreground colour"), 
-                x = 11, y = 60, "in" = frameC1)
+                x = 11, y = 60, `in` = frameC1)
             labelC1 <- tklabel(frameC1, background = local.ConvexHullAlphaBag.col.fg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelC1, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameC1, anchor = "ne")
+                relwidth = 0.125, `in` = frameC1, anchor = "ne")
             tkbind(labelC1, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ConvexHullAlphaBag.col.fg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2107,11 +2160,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameC1, text = "Background colour"), 
-                x = 11, y = 80, "in" = frameC1)
+                x = 11, y = 80, `in` = frameC1)
             labelC2 <- tklabel(frameC1, background = local.ConvexHullAlphaBag.col.bg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelC2, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameC1, anchor = "ne")
+                relwidth = 0.125, `in` = frameC1, anchor = "ne")
             tkbind(labelC2, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ConvexHullAlphaBag.col.bg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2124,9 +2177,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })
             frameC2 <- tkwidget(notebook.C, "TitleFrame", text = "Tukey median: plotting character")
             tkplace(frameC2, relx = 0.05, relwidth = 0.9, y = 130, 
-                height = 105, "in" = notebook.C)
+                height = 105, `in` = notebook.C)
             tkplace(tk2label(frameC2, text = "Symbol"), x = 11, 
-                y = 20, "in" = frameC2)
+                y = 20, `in` = frameC2)
             spinboxC2 <- tkwidget(frameC2, "SpinBox", textvariable = local.ConvexHullAlphaBag.TukeyMedian.pch.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", "NA", 0:25), 
                 justify = "right", modifycmd = function() {
@@ -2135,19 +2188,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.ConvexHullAlphaBag.TukeyMedian.pch.var[[temp1]] <<- tclVar(tclvalue(local.ConvexHullAlphaBag.TukeyMedian.pch.var[[1]]))
                 })
             tkplace(spinboxC2, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameC2, anchor = "ne")
+                relwidth = 0.125, `in` = frameC2, anchor = "ne")
             tkplace(tk2label(frameC2, text = "Size"), x = 11, 
-                y = 40, "in" = frameC2)
+                y = 40, `in` = frameC2)
             entryC2 <- tk2entry(frameC2, textvariable = local.ConvexHullAlphaBag.TukeyMedian.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryC2, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameC2, anchor = "ne")
+                relwidth = 0.125, `in` = frameC2, anchor = "ne")
             tkplace(tk2label(frameC2, text = "Foreground colour"), 
-                x = 11, y = 60, "in" = frameC2)
+                x = 11, y = 60, `in` = frameC2)
             labelC3 <- tklabel(frameC2, background = local.ConvexHullAlphaBag.TukeyMedian.col.fg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelC3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameC2, anchor = "ne")
+                relwidth = 0.125, `in` = frameC2, anchor = "ne")
             tkbind(labelC3, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ConvexHullAlphaBag.TukeyMedian.col.fg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2159,11 +2212,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameC2, text = "Background colour"), 
-                x = 11, y = 80, "in" = frameC2)
+                x = 11, y = 80, `in` = frameC2)
             labelC4 <- tklabel(frameC2, background = local.ConvexHullAlphaBag.TukeyMedian.col.bg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelC4, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameC2, anchor = "ne")
+                relwidth = 0.125, `in` = frameC2, anchor = "ne")
             tkbind(labelC4, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ConvexHullAlphaBag.TukeyMedian.col.bg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2176,9 +2229,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })
             frameC3 <- tkwidget(notebook.C, "TitleFrame", text = "Tukey median: label")
             tkplace(frameC3, relx = 0.05, relwidth = 0.9, y = 250, 
-                height = 125, "in" = notebook.C)
+                height = 125, `in` = notebook.C)
             tkplace(tk2label(frameC3, text = "Font"), x = 11, 
-                y = 20, "in" = frameC3)
+                y = 20, `in` = frameC3)
             spinboxC3 <- tkwidget(frameC3, "SpinBox", textvariable = local.ConvexHullAlphaBag.TukeyMedian.label.font.var[[WhichGroup]], 
                 editable = FALSE, values = c(" ", 1:4), justify = "right", 
                 modifycmd = function() {
@@ -2187,19 +2240,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.ConvexHullAlphaBag.TukeyMedian.label.font.var[[temp1]] <<- tclVar(tclvalue(local.ConvexHullAlphaBag.TukeyMedian.label.font.var[[1]]))
                 })
             tkplace(spinboxC3, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameC3, anchor = "ne")
+                relwidth = 0.125, `in` = frameC3, anchor = "ne")
             tkplace(tk2label(frameC3, text = "Size"), x = 11, 
-                y = 40, "in" = frameC3)
+                y = 40, `in` = frameC3)
             entryC3 <- tk2entry(frameC3, textvariable = local.ConvexHullAlphaBag.TukeyMedian.label.cex.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryC3, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameC3, anchor = "ne")
+                relwidth = 0.125, `in` = frameC3, anchor = "ne")
             tkplace(tk2label(frameC3, text = "Colour"), x = 11, 
-                y = 60, "in" = frameC3)
+                y = 60, `in` = frameC3)
             labelC5 <- tklabel(frameC3, background = local.ConvexHullAlphaBag.TukeyMedian.label.col.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelC5, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameC3, anchor = "ne")
+                relwidth = 0.125, `in` = frameC3, anchor = "ne")
             tkbind(labelC5, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ConvexHullAlphaBag.TukeyMedian.label.col.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2211,28 +2264,28 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameC3, text = "Horizontal offset"), 
-                x = 11, y = 80, "in" = frameC3)
+                x = 11, y = 80, `in` = frameC3)
             entryC4 <- tk2entry(frameC3, textvariable = local.ConvexHullAlphaBag.TukeyMedian.label.HorizOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryC4, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameC3, anchor = "ne")
+                relwidth = 0.125, `in` = frameC3, anchor = "ne")
             tkplace(tk2label(frameC3, text = "Vertical offset"), 
-                x = 11, y = 100, "in" = frameC3)
+                x = 11, y = 100, `in` = frameC3)
             entryC5 <- tk2entry(frameC3, textvariable = local.ConvexHullAlphaBag.TukeyMedian.label.VertOffset.var[[WhichGroup]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryC5, relx = 0.95, y = 100, height = 18, 
-                relwidth = 0.125, "in" = frameC3, anchor = "ne")
+                relwidth = 0.125, `in` = frameC3, anchor = "ne")
             notebook.D <- tk2frame(notebook)
             tkadd(notebook, notebook.D, text = "Classification regions")
             frameD1 <- tkwidget(notebook.D, "TitleFrame", text = "Region")
             tkplace(frameD1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 45, "in" = notebook.D)
+                height = 45, `in` = notebook.D)
             tkplace(tk2label(frameD1, text = "Background colour"), 
-                x = 11, y = 20, "in" = frameD1)
+                x = 11, y = 20, `in` = frameD1)
             labelD1 <- tklabel(frameD1, background = local.ClassificationRegion.col.bg.var[[WhichGroup]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelD1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameD1, anchor = "ne")
+                relwidth = 0.125, `in` = frameD1, anchor = "ne")
             tkbind(labelD1, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.ClassificationRegion.col.bg.var[[WhichGroup]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2243,22 +2296,22 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(g + 1)) local.ClassificationRegion.col.bg.var[[temp1]] <<- local.ClassificationRegion.col.bg.var[[1]]
                 }
             })
+            tkplace(listbox1, relx = 0.05, rely = 0.49, relwidth = 0.23, 
+                relheight = 0.88, `in` = top, anchor = "w")
+            tkplace(listbox1.scry, relx = 1, relheight = 1, `in` = listbox1, 
+                anchor = "ne")
+            tkplace(notebook, relx = 0.3, rely = 0.05, relwidth = 0.67, 
+                relheight = 0.88, `in` = top)
+            tkselect(notebook, WhichTabInitially - 1)
             button1 <- tk2button(top, text = "OK", width = 10, 
                 command = onOK)
             button2 <- tk2button(top, text = "Cancel", width = 10, 
                 command = onCancel)
             button3 <- tk2button(top, text = "Defaults", width = 10, 
                 command = onDefaults)
-            tkplace(listbox1, relx = 0.05, rely = 0.49, relwidth = 0.23, 
-                relheight = 0.88, "in" = top, anchor = "w")
-            tkplace(listbox1.scry, relx = 1, relheight = 1, "in" = listbox1, 
-                anchor = "ne")
-            tkplace(notebook, relx = 0.3, rely = 0.05, relwidth = 0.67, 
-                relheight = 0.88, "in" = top)
             tkplace(button1, relx = 0.84, rely = 0.99, anchor = "se")
             tkplace(button2, relx = 0.965, rely = 0.99, anchor = "se")
             tkplace(button3, relx = 0.05, rely = 0.99, anchor = "sw")
-            tkselect(notebook, WhichTabInitially - 1)
             tkbind(listbox1, "<<ListboxSelect>>", ChangeGroup)
             tkbind(top, "<Escape>", onCancel)
             tkbind(top, "<Destroy>", function() {
@@ -2398,6 +2451,49 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 else text2hex("SystemButtonFace")
                 tkconfigure(labelA4, background = local.axes.label.col.var[[WhichAxis]])
             }
+            onDefaults <- function() {
+                bpar.initialise2.func()
+                initialise()
+                ChangeGroup()
+            }
+            onOK <- function() {
+                UpdateEntryBoxes()
+                bpar$axes.lty <<- as.numeric(lapply(local.axes.lty.var[-1], 
+                  tclvalue))
+                bpar$axes.lwd <<- as.numeric(lapply(local.axes.lwd.var[-1], 
+                  tclvalue))
+                bpar$axes.col <<- unlist(local.axes.col.var[-1])
+                bpar$axes.tick.n <<- as.numeric(lapply(local.axes.tick.n.var[-1], 
+                  tclvalue))
+                bpar$axes.tick.lty <<- as.numeric(lapply(local.axes.tick.lty.var[-1], 
+                  tclvalue))
+                bpar$axes.tick.lwd <<- as.numeric(lapply(local.axes.tick.lwd.var[-1], 
+                  tclvalue))
+                bpar$axes.tick.col <<- unlist(local.axes.tick.col.var[-1])
+                bpar$axes.tick.RelLength <<- as.numeric(lapply(local.axes.tick.RelLength.var[-1], 
+                  tclvalue))
+                bpar$axes.marker.font <<- as.numeric(lapply(local.axes.marker.font.var[-1], 
+                  tclvalue))
+                bpar$axes.marker.cex <<- as.numeric(lapply(local.axes.marker.cex.var[-1], 
+                  tclvalue))
+                bpar$axes.marker.col <<- unlist(local.axes.marker.col.var[-1])
+                bpar$axes.marker.RelOffset <<- as.numeric(lapply(local.axes.marker.RelOffset.var[-1], 
+                  tclvalue))
+                bpar$axes.label.font <<- as.numeric(lapply(local.axes.label.font.var[-1], 
+                  tclvalue))
+                bpar$axes.label.cex <<- as.numeric(lapply(local.axes.label.cex.var[-1], 
+                  tclvalue))
+                bpar$axes.label.las <<- as.numeric(lapply(local.axes.label.las.var[-1], 
+                  tclvalue))
+                bpar$axes.label.col <<- unlist(local.axes.label.col.var[-1])
+                Biplot.replot()
+                if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
+                  AxesTab.replot()
+                if (p.in < p) 
+                  Kraal.replot()
+                tkdestroy(top)
+            }
+            onCancel <- function() tkdestroy(top)
             local.axes.lty.var <- NULL
             local.axes.lwd.var <- NULL
             local.axes.col.var <- NULL
@@ -2466,49 +2562,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   as.character(bpar$axes.label.col)), text2hex)
             }
             initialise()
-            onOK <- function() {
-                UpdateEntryBoxes()
-                bpar$axes.lty <<- as.numeric(lapply(local.axes.lty.var[-1], 
-                  tclvalue))
-                bpar$axes.lwd <<- as.numeric(lapply(local.axes.lwd.var[-1], 
-                  tclvalue))
-                bpar$axes.col <<- unlist(local.axes.col.var[-1])
-                bpar$axes.tick.n <<- as.numeric(lapply(local.axes.tick.n.var[-1], 
-                  tclvalue))
-                bpar$axes.tick.lty <<- as.numeric(lapply(local.axes.tick.lty.var[-1], 
-                  tclvalue))
-                bpar$axes.tick.lwd <<- as.numeric(lapply(local.axes.tick.lwd.var[-1], 
-                  tclvalue))
-                bpar$axes.tick.col <<- unlist(local.axes.tick.col.var[-1])
-                bpar$axes.tick.RelLength <<- as.numeric(lapply(local.axes.tick.RelLength.var[-1], 
-                  tclvalue))
-                bpar$axes.marker.font <<- as.numeric(lapply(local.axes.marker.font.var[-1], 
-                  tclvalue))
-                bpar$axes.marker.cex <<- as.numeric(lapply(local.axes.marker.cex.var[-1], 
-                  tclvalue))
-                bpar$axes.marker.col <<- unlist(local.axes.marker.col.var[-1])
-                bpar$axes.marker.RelOffset <<- as.numeric(lapply(local.axes.marker.RelOffset.var[-1], 
-                  tclvalue))
-                bpar$axes.label.font <<- as.numeric(lapply(local.axes.label.font.var[-1], 
-                  tclvalue))
-                bpar$axes.label.cex <<- as.numeric(lapply(local.axes.label.cex.var[-1], 
-                  tclvalue))
-                bpar$axes.label.las <<- as.numeric(lapply(local.axes.label.las.var[-1], 
-                  tclvalue))
-                bpar$axes.label.col <<- unlist(local.axes.label.col.var[-1])
-                Biplot.replot()
-                if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
-                  AxesTab.replot()
-                if (p.in < p) 
-                  Kraal.replot()
-                tkdestroy(top)
-            }
-            onCancel <- function() tkdestroy(top)
-            onDefaults <- function() {
-                bpar.initialise2.func()
-                initialise()
-                ChangeGroup()
-            }
             listbox1 <- tkwidget(top, "listbox", bg = "white", 
                 relief = "groove", borderwidth = "1.5p", yscrollcommand = function(...) tkset(listbox1.scry, 
                   ...))
@@ -2522,9 +2575,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             frameA <- tk2frame(top, relief = "groove", borderwidth = "1.5p")
             frameA1 <- tkwidget(top, "TitleFrame", text = "Axis")
             tkplace(frameA1, relx = 0.05, relwidth = 0.9, y = 10, 
-                height = 85, "in" = frameA)
+                height = 85, `in` = frameA)
             tkplace(tk2label(frameA1, text = "Line type"), x = 11, 
-                y = 20, "in" = frameA1)
+                y = 20, `in` = frameA1)
             spinboxA1 <- tkwidget(frameA1, "SpinBox", textvariable = local.axes.lty.var[[WhichAxis]], 
                 editable = FALSE, values = c(" ", 0:6), justify = "right", 
                 modifycmd = function() {
@@ -2533,19 +2586,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.lty.var[[temp1]] <<- tclVar(tclvalue(local.axes.lty.var[[1]]))
                 })
             tkplace(spinboxA1, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkplace(tk2label(frameA1, text = "Line width"), x = 11, 
-                y = 40, "in" = frameA1)
+                y = 40, `in` = frameA1)
             entryA1 <- tk2entry(frameA1, textvariable = local.axes.lwd.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA1, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkplace(tk2label(frameA1, text = "Colour"), x = 11, 
-                y = 60, "in" = frameA1)
+                y = 60, `in` = frameA1)
             labelA1 <- tklabel(frameA1, background = local.axes.col.var[[WhichAxis]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA1, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA1, anchor = "ne")
+                relwidth = 0.125, `in` = frameA1, anchor = "ne")
             tkbind(labelA1, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.axes.col.var[[WhichAxis]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2558,15 +2611,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })
             frameA2 <- tkwidget(top, "TitleFrame", text = "Ticks")
             tkplace(frameA2, relx = 0.05, relwidth = 0.9, y = 105, 
-                height = 125, "in" = frameA)
+                height = 125, `in` = frameA)
             tkplace(tk2label(frameA2, text = "Desired number"), 
-                x = 11, y = 20, "in" = frameA2)
+                x = 11, y = 20, `in` = frameA2)
             entryA2 <- tk2entry(frameA2, textvariable = local.axes.tick.n.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA2, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Line type"), x = 11, 
-                y = 40, "in" = frameA2)
+                y = 40, `in` = frameA2)
             spinboxA2 <- tkwidget(frameA2, "SpinBox", textvariable = local.axes.tick.lty.var[[WhichAxis]], 
                 editable = FALSE, values = c(" ", 0:6), justify = "right", 
                 modifycmd = function() {
@@ -2575,19 +2628,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.tick.lty.var[[temp1]] <<- tclVar(tclvalue(local.axes.tick.lty.var[[1]]))
                 })
             tkplace(spinboxA2, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Line width"), x = 11, 
-                y = 60, "in" = frameA2)
+                y = 60, `in` = frameA2)
             entryA3 <- tk2entry(frameA2, textvariable = local.axes.tick.lwd.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkplace(tk2label(frameA2, text = "Colour"), x = 11, 
-                y = 80, "in" = frameA2)
+                y = 80, `in` = frameA2)
             labelA2 <- tklabel(frameA2, background = local.axes.tick.col.var[[WhichAxis]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA2, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             tkbind(labelA2, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.axes.tick.col.var[[WhichAxis]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2599,16 +2652,16 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameA2, text = "Relative length"), 
-                x = 11, y = 100, "in" = frameA2)
+                x = 11, y = 100, `in` = frameA2)
             entryA4 <- tk2entry(frameA2, textvariable = local.axes.tick.RelLength.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA4, relx = 0.95, y = 100, height = 18, 
-                relwidth = 0.125, "in" = frameA2, anchor = "ne")
+                relwidth = 0.125, `in` = frameA2, anchor = "ne")
             frameA3 <- tkwidget(top, "TitleFrame", text = "Markers")
             tkplace(frameA3, relx = 0.05, relwidth = 0.9, y = 240, 
-                height = 105, "in" = frameA)
+                height = 105, `in` = frameA)
             tkplace(tk2label(frameA3, text = "Font"), x = 11, 
-                y = 20, "in" = frameA3)
+                y = 20, `in` = frameA3)
             spinboxA3 <- tkwidget(frameA3, "SpinBox", textvariable = local.axes.marker.font.var[[WhichAxis]], 
                 editable = FALSE, values = c(" ", 1:4), justify = "right", 
                 modifycmd = function() {
@@ -2617,19 +2670,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.marker.font.var[[temp1]] <<- tclVar(tclvalue(local.axes.marker.font.var[[1]]))
                 })
             tkplace(spinboxA3, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA3, anchor = "ne")
+                relwidth = 0.125, `in` = frameA3, anchor = "ne")
             tkplace(tk2label(frameA3, text = "Size"), x = 11, 
-                y = 40, "in" = frameA3)
+                y = 40, `in` = frameA3)
             entryA5 <- tk2entry(frameA3, textvariable = local.axes.marker.cex.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA5, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA3, anchor = "ne")
+                relwidth = 0.125, `in` = frameA3, anchor = "ne")
             tkplace(tk2label(frameA3, text = "Colour"), x = 11, 
-                y = 60, "in" = frameA3)
+                y = 60, `in` = frameA3)
             labelA3 <- tklabel(frameA3, background = local.axes.marker.col.var[[WhichAxis]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA3, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA3, anchor = "ne")
+                relwidth = 0.125, `in` = frameA3, anchor = "ne")
             tkbind(labelA3, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.axes.marker.col.var[[WhichAxis]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2641,16 +2694,16 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 }
             })
             tkplace(tk2label(frameA3, text = "Relative offset"), 
-                x = 11, y = 80, "in" = frameA3)
+                x = 11, y = 80, `in` = frameA3)
             entryA6 <- tk2entry(frameA3, textvariable = local.axes.marker.RelOffset.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA6, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameA3, anchor = "ne")
+                relwidth = 0.125, `in` = frameA3, anchor = "ne")
             frameA4 <- tkwidget(top, "TitleFrame", text = "Label")
             tkplace(frameA4, relx = 0.05, relwidth = 0.9, y = 355, 
-                height = 105, "in" = frameA)
+                height = 105, `in` = frameA)
             tkplace(tk2label(frameA4, text = "Font"), x = 11, 
-                y = 20, "in" = frameA4)
+                y = 20, `in` = frameA4)
             spinboxA4 <- tkwidget(frameA4, "SpinBox", textvariable = local.axes.label.font.var[[WhichAxis]], 
                 editable = FALSE, values = c(" ", 1:4), justify = "right", 
                 modifycmd = function() {
@@ -2659,15 +2712,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.label.font.var[[temp1]] <<- tclVar(tclvalue(local.axes.label.font.var[[1]]))
                 })
             tkplace(spinboxA4, relx = 0.95, y = 20, height = 18, 
-                relwidth = 0.125, "in" = frameA4, anchor = "ne")
+                relwidth = 0.125, `in` = frameA4, anchor = "ne")
             tkplace(tk2label(frameA4, text = "Size"), x = 11, 
-                y = 40, "in" = frameA4)
+                y = 40, `in` = frameA4)
             entryA7 <- tk2entry(frameA4, textvariable = local.axes.label.cex.var[[WhichAxis]], 
                 justify = "right", takefocus = FALSE)
             tkplace(entryA7, relx = 0.95, y = 40, height = 18, 
-                relwidth = 0.125, "in" = frameA4, anchor = "ne")
+                relwidth = 0.125, `in` = frameA4, anchor = "ne")
             tkplace(tk2label(frameA4, text = "Orientation"), 
-                x = 11, y = 60, "in" = frameA4)
+                x = 11, y = 60, `in` = frameA4)
             spinboxA5 <- tkwidget(frameA4, "SpinBox", textvariable = local.axes.label.las.var[[WhichAxis]], 
                 editable = FALSE, values = c(" ", 0:3), justify = "right", 
                 modifycmd = function() {
@@ -2676,13 +2729,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.label.las.var[[temp1]] <<- tclVar(tclvalue(local.axes.label.las.var[[1]]))
                 })
             tkplace(spinboxA5, relx = 0.95, y = 60, height = 18, 
-                relwidth = 0.125, "in" = frameA4, anchor = "ne")
+                relwidth = 0.125, `in` = frameA4, anchor = "ne")
             tkplace(tk2label(frameA4, text = "Colour"), x = 11, 
-                y = 80, "in" = frameA4)
+                y = 80, `in` = frameA4)
             labelA4 <- tklabel(frameA4, background = local.axes.label.col.var[[WhichAxis]], 
                 relief = "groove", borderwidth = "1.5p")
             tkplace(labelA4, relx = 0.95, y = 80, height = 18, 
-                relwidth = 0.125, "in" = frameA4, anchor = "ne")
+                relwidth = 0.125, `in` = frameA4, anchor = "ne")
             tkbind(labelA4, "<Button-1>", function() {
                 temp1 <- tkchooseColor(initialcolor = local.axes.label.col.var[[WhichAxis]])
                 if (!(tclvalue(temp1) == "")) {
@@ -2693,21 +2746,21 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     for (temp1 in 2:(p + 1)) local.axes.label.col.var[[temp1]] <<- local.axes.label.col.var[[1]]
                 }
             })
+            tkplace(listbox1, relx = 0.05, rely = 0.49, relwidth = 0.23, 
+                relheight = 0.88, `in` = top, anchor = "w")
+            tkplace(listbox1.scry, relx = 1, relheight = 1, `in` = listbox1, 
+                anchor = "ne")
             button1 <- tk2button(top, text = "OK", width = 10, 
                 command = onOK)
             button2 <- tk2button(top, text = "Cancel", width = 10, 
                 command = onCancel)
             button3 <- tk2button(top, text = "Defaults", width = 10, 
                 command = onDefaults)
-            tkplace(listbox1, relx = 0.05, rely = 0.49, relwidth = 0.23, 
-                relheight = 0.88, "in" = top, anchor = "w")
-            tkplace(listbox1.scry, relx = 1, relheight = 1, "in" = listbox1, 
-                anchor = "ne")
             tkplace(button1, relx = 0.84, rely = 0.99, anchor = "se")
             tkplace(button2, relx = 0.965, rely = 0.99, anchor = "se")
             tkplace(button3, relx = 0.05, rely = 0.99, anchor = "sw")
             tkplace(frameA, relx = 0.3, rely = 0.05, relwidth = 0.67, 
-                relheight = 0.88, "in" = top)
+                relheight = 0.88, `in` = top)
             tkbind(listbox1, "<<ListboxSelect>>", ChangeGroup)
             tkbind(top, "<Escape>", onCancel)
             tkbind(top, "<Destroy>", function() {
@@ -2785,9 +2838,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             bpar$interaction.highlight.ShowValues.digits <<- as.numeric(tclvalue(local.interaction.highlight.ShowValues.digits.var))
             Biplot.replot()
         }
-        onCancel <- function() {
-            tkdestroy(top)
-        }
+        onCancel <- function() tkdestroy(top)
         local.interaction.prediction.lty.var <- tclVar(bpar$interaction.prediction.lty)
         local.interaction.prediction.lwd.var <- tclVar(bpar$interaction.prediction.lwd)
         local.interaction.prediction.col.var <- text2hex(bpar$interaction.prediction.col)
@@ -2805,25 +2856,25 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         local.interaction.highlight.ShowValues.digits.var <- tclVar(bpar$interaction.highlight.ShowValues.digits)
         frame1 <- tkwidget(top, "TitleFrame", text = "Prediction")
         tkplace(frame1, relx = 0.05, relwidth = 0.9, y = 10, 
-            height = 165, "in" = top)
+            height = 165, `in` = top)
         tkplace(tk2label(frame1, text = "Line type"), x = 11, 
-            y = 20, "in" = frame1)
+            y = 20, `in` = frame1)
         spinbox1 <- tkwidget(frame1, "SpinBox", textvariable = local.interaction.prediction.lty.var, 
             editable = FALSE, values = c(" ", "NA", 0:6), justify = "right")
         tkplace(spinbox1, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Line width"), x = 11, 
-            y = 40, "in" = frame1)
+            y = 40, `in` = frame1)
         entry1 <- tk2entry(frame1, textvariable = local.interaction.prediction.lwd.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry1, relx = 0.95, y = 40, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Colour"), x = 11, y = 60, 
-            "in" = frame1)
+            `in` = frame1)
         label1 <- tklabel(frame1, background = local.interaction.prediction.col.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label1, relx = 0.95, y = 60, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkbind(label1, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.interaction.prediction.col.var)
             if (!(tclvalue(temp1) == "")) {
@@ -2833,29 +2884,29 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame1, text = "Plotting character: symbol"), 
-            x = 11, y = 80, "in" = frame1)
+            x = 11, y = 80, `in` = frame1)
         spinbox2 <- tkwidget(frame1, "SpinBox", textvariable = local.interaction.prediction.pch.var, 
             editable = FALSE, values = c(" ", "NA", 0:25), justify = "right")
         tkplace(spinbox2, relx = 0.95, y = 80, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Plotting character: size"), 
-            x = 11, y = 100, "in" = frame1)
+            x = 11, y = 100, `in` = frame1)
         entry2 <- tk2entry(frame1, textvariable = local.interaction.prediction.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry2, relx = 0.95, y = 100, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Circle: line width"), 
-            x = 11, y = 120, "in" = frame1)
+            x = 11, y = 120, `in` = frame1)
         entry3 <- tk2entry(frame1, textvariable = local.interaction.prediction.circle.lwd.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry3, relx = 0.95, y = 120, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Circle: colour"), x = 11, 
-            y = 140, "in" = frame1)
+            y = 140, `in` = frame1)
         label2 <- tklabel(frame1, background = local.interaction.prediction.circle.col.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label2, relx = 0.95, y = 140, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkbind(label2, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.interaction.prediction.circle.col.var)
             if (!(tclvalue(temp1) == "")) {
@@ -2866,13 +2917,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         })
         frame2 <- tkwidget(top, "TitleFrame", text = "Highlighted axis")
         tkplace(frame2, relx = 0.05, relwidth = 0.9, y = 190, 
-            height = 185, "in" = top)
+            height = 185, `in` = top)
         tkplace(tk2label(frame2, text = "Colour"), x = 11, y = 20, 
-            "in" = frame2)
+            `in` = frame2)
         label3 <- tklabel(frame2, background = local.interaction.highlight.axes.col.fg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label3, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkbind(label3, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.interaction.highlight.axes.col.fg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -2882,11 +2933,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame2, text = "Other axes: colour"), 
-            x = 11, y = 40, "in" = frame2)
+            x = 11, y = 40, `in` = frame2)
         label4 <- tklabel(frame2, background = local.interaction.highlight.axes.col.bg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label4, relx = 0.95, y = 40, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkbind(label4, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.interaction.highlight.axes.col.bg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -2896,23 +2947,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame2, text = "Show point values: font"), 
-            x = 11, y = 60, "in" = frame2)
+            x = 11, y = 60, `in` = frame2)
         spinbox3 <- tkwidget(frame2, "SpinBox", textvariable = local.interaction.highlight.ShowValues.font.var, 
             editable = FALSE, values = c(" ", 1:4), justify = "right")
         tkplace(spinbox3, relx = 0.95, y = 60, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Show point values: size"), 
-            x = 11, y = 80, "in" = frame2)
+            x = 11, y = 80, `in` = frame2)
         entry4 <- tk2entry(frame2, textvariable = local.interaction.highlight.ShowValues.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry4, relx = 0.95, y = 80, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Show point values: colour"), 
-            x = 11, y = 100, "in" = frame2)
+            x = 11, y = 100, `in` = frame2)
         label5 <- tklabel(frame2, background = local.interaction.highlight.ShowValues.col.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label5, relx = 0.95, y = 100, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkbind(label5, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.interaction.highlight.ShowValues.col.var)
             if (!(tclvalue(temp1) == "")) {
@@ -2922,23 +2973,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame2, text = "Show point values: horizontal offset"), 
-            x = 11, y = 120, "in" = frame2)
+            x = 11, y = 120, `in` = frame2)
         entry5 <- tk2entry(frame2, textvariable = local.interaction.highlight.ShowValues.HorizOffset.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry5, relx = 0.95, y = 120, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Show point values: vertical offset"), 
-            x = 11, y = 140, "in" = frame2)
+            x = 11, y = 140, `in` = frame2)
         entry6 <- tk2entry(frame2, textvariable = local.interaction.highlight.ShowValues.VertOffset.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry6, relx = 0.95, y = 140, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Show point values: digits"), 
-            x = 11, y = 160, "in" = frame2)
+            x = 11, y = 160, `in` = frame2)
         spinbox4 <- tkwidget(frame2, "SpinBox", textvariable = local.interaction.highlight.ShowValues.digits.var, 
             editable = FALSE, values = 0:8, justify = "right")
         tkplace(spinbox4, relx = 0.95, y = 160, height = 18, 
-            relwidth = 0.125, "in" = frame2, anchor = "ne")
+            relwidth = 0.125, `in` = frame2, anchor = "ne")
         button1 <- tk2button(top, text = "Defaults", width = 10, 
             command = onDefaults)
         button2 <- tk2button(top, text = "OK", width = 10, command = onOK)
@@ -3045,9 +3096,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GroupsTab.replot()
             AxesTab.replot()
         }
-        onCancel <- function() {
-            tkdestroy(top)
-        }
+        onCancel <- function() tkdestroy(top)
         local.DiagnosticTabs.convergence.lty.var <- tclVar(bpar$DiagnosticTabs.convergence.lty)
         local.DiagnosticTabs.convergence.lwd.var <- tclVar(bpar$DiagnosticTabs.convergence.lwd)
         local.DiagnosticTabs.convergence.col.var <- text2hex(bpar$DiagnosticTabs.convergence.col)
@@ -3072,25 +3121,25 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         local.DiagnosticTabs.predictions.digits.var <- tclVar(bpar$DiagnosticTabs.predictions.digits)
         frame1 <- tkwidget(top, "TitleFrame", text = "Convergence")
         tkplace(frame1, relx = 0.05, relwidth = 0.9, y = 10, 
-            height = 85, "in" = top)
+            height = 85, `in` = top)
         tkplace(tk2label(frame1, text = "Line type"), x = 11, 
-            y = 20, "in" = frame1)
+            y = 20, `in` = frame1)
         spinbox1 <- tkwidget(frame1, "SpinBox", textvariable = local.DiagnosticTabs.convergence.lty.var, 
             editable = FALSE, values = c(" ", "NA", 0:6), justify = "right")
         tkplace(spinbox1, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Line width"), x = 11, 
-            y = 40, "in" = frame1)
+            y = 40, `in` = frame1)
         entry1 <- tk2entry(frame1, textvariable = local.DiagnosticTabs.convergence.lwd.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry1, relx = 0.95, y = 40, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkplace(tk2label(frame1, text = "Colour"), x = 11, y = 60, 
-            "in" = frame1)
+            `in` = frame1)
         label1 <- tklabel(frame1, background = local.DiagnosticTabs.convergence.col.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label1, relx = 0.95, y = 60, height = 18, relwidth = 0.125, 
-            "in" = frame1, anchor = "ne")
+            `in` = frame1, anchor = "ne")
         tkbind(label1, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.convergence.col.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3101,64 +3150,64 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         })
         frame2 <- tkwidget(top, "TitleFrame", text = "Predictivities")
         tkplace(frame2, relx = 0.05, relwidth = 0.9, y = 110, 
-            height = 145, "in" = top)
+            height = 145, `in` = top)
         tkplace(tk2label(frame2, text = "Plotting character: axes symbol"), 
-            x = 11, y = 20, "in" = frame2)
+            x = 11, y = 20, `in` = frame2)
         spinbox2 <- tkwidget(frame2, "SpinBox", textvariable = local.DiagnosticTabs.predictivities.axes.pch.var, 
             editable = FALSE, values = c(" ", "NA", 0:25), justify = "right")
         tkplace(spinbox2, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Plotting character: size"), 
-            x = 11, y = 40, "in" = frame2)
+            x = 11, y = 40, `in` = frame2)
         entry2 <- tk2entry(frame2, textvariable = local.DiagnosticTabs.predictivities.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry2, relx = 0.95, y = 40, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Label: font"), x = 11, 
-            y = 60, "in" = frame2)
+            y = 60, `in` = frame2)
         spinbox3 <- tkwidget(frame2, "SpinBox", textvariable = local.DiagnosticTabs.predictivities.label.font.var, 
             editable = FALSE, values = c(" ", 1:4), justify = "right")
         tkplace(spinbox3, relx = 0.95, y = 60, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Label: size"), x = 11, 
-            y = 80, "in" = frame2)
+            y = 80, `in` = frame2)
         entry3 <- tk2entry(frame2, textvariable = local.DiagnosticTabs.predictivities.label.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry3, relx = 0.95, y = 80, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Label: horizontal offset"), 
-            x = 11, y = 100, "in" = frame2)
+            x = 11, y = 100, `in` = frame2)
         entry4 <- tk2entry(frame2, textvariable = local.DiagnosticTabs.predictivities.label.HorizOffset.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry4, relx = 0.95, y = 100, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         tkplace(tk2label(frame2, text = "Label: vertical offset"), 
-            x = 11, y = 120, "in" = frame2)
+            x = 11, y = 120, `in` = frame2)
         entry5 <- tk2entry(frame2, textvariable = local.DiagnosticTabs.predictivities.label.VertOffset.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry5, relx = 0.95, y = 120, height = 18, relwidth = 0.125, 
-            "in" = frame2, anchor = "ne")
+            `in` = frame2, anchor = "ne")
         frame3 <- tkwidget(top, "TitleFrame", text = "Shepard diagram")
         tkplace(frame3, relx = 0.05, relwidth = 0.9, y = 270, 
-            height = 265, "in" = top)
+            height = 265, `in` = top)
         tkplace(tk2label(frame3, text = "Plotting character: symbol"), 
-            x = 11, y = 20, "in" = frame3)
+            x = 11, y = 20, `in` = frame3)
         spinbox4 <- tkwidget(frame3, "SpinBox", textvariable = local.DiagnosticTabs.ShepardDiagram.pch.var, 
             editable = FALSE, values = c(" ", "NA", 0:25), justify = "right")
         tkplace(spinbox4, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Plotting character: size"), 
-            x = 11, y = 40, "in" = frame3)
+            x = 11, y = 40, `in` = frame3)
         entry6 <- tk2entry(frame3, textvariable = local.DiagnosticTabs.ShepardDiagram.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry6, relx = 0.95, y = 40, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Plotting character: foreground colour"), 
-            x = 11, y = 60, "in" = frame3)
+            x = 11, y = 60, `in` = frame3)
         label2 <- tklabel(frame3, background = local.DiagnosticTabs.ShepardDiagram.col.fg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label2, relx = 0.95, y = 60, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkbind(label2, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.ShepardDiagram.col.fg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3168,11 +3217,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame3, text = "Plotting character: background colour"), 
-            x = 11, y = 80, "in" = frame3)
+            x = 11, y = 80, `in` = frame3)
         label3 <- tklabel(frame3, background = local.DiagnosticTabs.ShepardDiagram.col.bg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label3, relx = 0.95, y = 80, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkbind(label3, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.ShepardDiagram.col.bg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3182,23 +3231,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame3, text = "Disparities: line type"), 
-            x = 11, y = 100, "in" = frame3)
+            x = 11, y = 100, `in` = frame3)
         spinbox5 <- tkwidget(frame3, "SpinBox", textvariable = local.DiagnosticTabs.ShepardDiagram.disparities.lty.var, 
             editable = FALSE, values = c(" ", "NA", 0:6), justify = "right")
         tkplace(spinbox5, relx = 0.95, y = 100, height = 18, 
-            relwidth = 0.125, "in" = frame3, anchor = "ne")
+            relwidth = 0.125, `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Disparities: line width"), 
-            x = 11, y = 120, "in" = frame3)
+            x = 11, y = 120, `in` = frame3)
         entry7 <- tk2entry(frame3, textvariable = local.DiagnosticTabs.ShepardDiagram.disparities.lwd.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry7, relx = 0.95, y = 120, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Disparities: line colour"), 
-            x = 11, y = 140, "in" = frame3)
+            x = 11, y = 140, `in` = frame3)
         label4 <- tklabel(frame3, background = local.DiagnosticTabs.ShepardDiagram.disparities.col.line.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label4, relx = 0.95, y = 140, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkbind(label4, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.ShepardDiagram.disparities.col.line.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3208,23 +3257,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame3, text = "Disparities: plotting character: symbol"), 
-            x = 11, y = 160, "in" = frame3)
+            x = 11, y = 160, `in` = frame3)
         spinbox6 <- tkwidget(frame3, "SpinBox", textvariable = local.DiagnosticTabs.ShepardDiagram.disparities.pch.var, 
             editable = FALSE, values = c(" ", "NA", 0:25), justify = "right")
         tkplace(spinbox6, relx = 0.95, y = 160, height = 18, 
-            relwidth = 0.125, "in" = frame3, anchor = "ne")
+            relwidth = 0.125, `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Disparities: plotting character: size"), 
-            x = 11, y = 180, "in" = frame3)
+            x = 11, y = 180, `in` = frame3)
         entry8 <- tk2entry(frame3, textvariable = local.DiagnosticTabs.ShepardDiagram.disparities.cex.var, 
             justify = "right", takefocus = FALSE)
         tkplace(entry8, relx = 0.95, y = 180, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkplace(tk2label(frame3, text = "Disparities: plotting character: foreground colour"), 
-            x = 11, y = 200, "in" = frame3)
+            x = 11, y = 200, `in` = frame3)
         label5 <- tklabel(frame3, background = local.DiagnosticTabs.ShepardDiagram.disparities.col.fg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label5, relx = 0.95, y = 200, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkbind(label5, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.ShepardDiagram.disparities.col.fg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3234,11 +3283,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame3, text = "Disparities: plotting character: background colour"), 
-            x = 11, y = 220, "in" = frame3)
+            x = 11, y = 220, `in` = frame3)
         label6 <- tklabel(frame3, background = local.DiagnosticTabs.ShepardDiagram.disparities.col.bg.var, 
             relief = "groove", borderwidth = "1.5p")
         tkplace(label6, relx = 0.95, y = 220, height = 18, relwidth = 0.125, 
-            "in" = frame3, anchor = "ne")
+            `in` = frame3, anchor = "ne")
         tkbind(label6, "<Button-1>", function() {
             temp1 <- tkchooseColor(initialcolor = local.DiagnosticTabs.ShepardDiagram.disparities.col.bg.var)
             if (!(tclvalue(temp1) == "")) {
@@ -3248,20 +3297,20 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         })
         tkplace(tk2label(frame3, text = "Number of worst-fitting point pairs"), 
-            x = 11, y = 240, "in" = frame3)
+            x = 11, y = 240, `in` = frame3)
         spinbox7 <- tkwidget(frame3, "SpinBox", textvariable = local.DiagnosticTabs.ShepardDiagram.WorstFittingPointPairs.var, 
             editable = FALSE, values = c(0:10), justify = "right")
         tkplace(spinbox7, relx = 0.95, y = 240, height = 18, 
-            relwidth = 0.125, "in" = frame3, anchor = "ne")
+            relwidth = 0.125, `in` = frame3, anchor = "ne")
         frame4 <- tkwidget(top, "TitleFrame", text = "Predictions")
         tkplace(frame4, relx = 0.05, relwidth = 0.9, y = 550, 
-            height = 45, "in" = top)
+            height = 45, `in` = top)
         tkplace(tk2label(frame4, text = "Digits"), x = 11, y = 20, 
-            "in" = frame4)
+            `in` = frame4)
         spinbox8 <- tkwidget(frame4, "SpinBox", textvariable = local.DiagnosticTabs.predictions.digits.var, 
             editable = FALSE, values = c(0:8), justify = "right")
         tkplace(spinbox8, relx = 0.95, y = 20, height = 18, relwidth = 0.125, 
-            "in" = frame4, anchor = "ne")
+            `in` = frame4, anchor = "ne")
         button1 <- tk2button(top, text = "Defaults", width = 10, 
             command = onDefaults)
         button2 <- tk2button(top, text = "OK", width = 10, command = onOK)
@@ -3326,8 +3375,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Joint.PCA.plot
         Biplot.predictions <<- Joint.PCA.predictions
         Biplot.interpolate <<- Joint.PCA.interpolate
-        Biplot.OverAxis <<- Joint.PCA.OverAxis
         Biplot.motion <<- Joint.PCA.motion
+        Biplot.OverAxis <<- Joint.PCA.OverAxis
         Biplot.LeftClick <<- Joint.PCA.LeftClick
         Biplot.LeftRelease <<- Joint.PCA.LeftRelease
         Biplot.DoubleLeftClick <<- Joint.PCA.DoubleLeftClick
@@ -3362,9 +3411,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Joint.PCA.plot <- function(screen = TRUE) Biplot.linear.plot(screen)
     Joint.PCA.predictions <- function() Biplot.linear.predictions()
     Joint.PCA.interpolate <- function(ToInterpolate) Biplot.linear.interpolate(ToInterpolate)
-    Joint.PCA.OverAxis <- function() Biplot.linear.OverAxis()
     Joint.PCA.motion <- function(x, y) Biplot.general.motion(x, 
         y)
+    Joint.PCA.OverAxis <- function() Biplot.linear.OverAxis()
     Joint.PCA.LeftClick <- function(x, y) Biplot.general.LeftClick(x, 
         y)
     Joint.PCA.LeftRelease <- function(x, y) Biplot.general.LeftRelease(x, 
@@ -3389,8 +3438,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Joint.CovarianceCorrelation.plot
         Biplot.predictions <<- Joint.CovarianceCorrelation.predictions
         Biplot.interpolate <<- Joint.CovarianceCorrelation.interpolate
-        Biplot.OverAxis <<- Joint.CovarianceCorrelation.OverAxis
         Biplot.motion <<- Joint.CovarianceCorrelation.motion
+        Biplot.OverAxis <<- Joint.CovarianceCorrelation.OverAxis
         Biplot.LeftClick <<- Joint.CovarianceCorrelation.LeftClick
         Biplot.LeftRelease <<- Joint.CovarianceCorrelation.LeftRelease
         Biplot.DoubleLeftClick <<- Joint.CovarianceCorrelation.DoubleLeftClick
@@ -3450,8 +3499,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Joint.CVA.plot
         Biplot.predictions <<- Joint.CVA.predictions
         Biplot.interpolate <<- Joint.CVA.interpolate
-        Biplot.OverAxis <<- Joint.CVA.OverAxis
         Biplot.motion <<- Joint.CVA.motion
+        Biplot.OverAxis <<- Joint.CVA.OverAxis
         Biplot.LeftClick <<- Joint.CVA.LeftClick
         Biplot.LeftRelease <<- Joint.CVA.LeftRelease
         Biplot.DoubleLeftClick <<- Joint.CVA.DoubleLeftClick
@@ -3521,13 +3570,36 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Joint.CVA.RightClick <- function(x, y) Biplot.general.RightClick(x, 
         y)
     Joint.CVA.plot3D <- function() Biplot.linear.plot3D()
-    Points.DistanceMetric.Pythagoras.func <- function(X, Y) {
+    Points.var <- tclVar("0")
+    Points.skipped <- FALSE
+    Points.FollowThrough.cmd <- function() {
+        tkconfigure(Other.ProgressBar.pb, value = 3/6 * 100)
+        .Tcl("update")
+        switch(tclvalue(Biplot.Axes.var), `10` = Axes.None.cmd(), 
+            `11` = Axes.Regression.cmd(), `12` = Axes.Procrustes.cmd(), 
+            `13` = Axes.CircularNonLinear.cmd())
+    }
+    Points.DissimilarityMetric.var <- tclVar("0")
+    Points.DissimilarityMetric.func <- NULL
+    Points.DissimilarityMetric.derivfunc <- NULL
+    Points.DissimilarityMetric.DissimilarityMatrix <- NULL
+    Points.DissimilarityMetric.DisparityMatrix <- NULL
+    Points.DissimilarityMetric.DistanceMatrix <- NULL
+    Points.DissimilarityMetric.FollowThrough.cmd <- function() {
+        tkconfigure(Other.ProgressBar.pb, value = 2/6 * 100)
+        .Tcl("update")
+        switch(tclvalue(Points.var), `0` = Points.PCO.cmd(), 
+            `10` = Points.MDS.IdentityTransformation.cmd(), `11` = Points.MDS.MonotoneRegression.cmd(), 
+            `12` = Points.MDS.MonotoneSplineTransformation.autcmd())
+    }
+    Points.DissimilarityMetric.Pythagoras.func <- function(X, 
+        Y) {
         if (missing(Y)) 
             as.matrix(dist(X))
         else c(PythagorasDistance(matrix(X, nrow = 1), Y))
     }
-    Points.DistanceMetric.Pythagoras.derivfunc <- NULL
-    Points.DistanceMetric.Pythagoras.cmd <- function(FollowThrough = TRUE) {
+    Points.DissimilarityMetric.Pythagoras.derivfunc <- NULL
+    Points.DissimilarityMetric.Pythagoras.cmd <- function(FollowThrough = TRUE) {
         if (tclvalue(Points.var) == "0" && tclvalue(Biplot.Axes.var) %in% 
             c("0", "1", "2")) 
             Biplot.Axes.var <<- tclVar("11")
@@ -3536,20 +3608,20 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "14")) 
             Biplot.Axes.var <<- tclVar("11")
         Points.skipped <<- FALSE
-        Points.DistanceMetric.func <<- Points.DistanceMetric.Pythagoras.func
-        Points.DistanceMetric.derivfunc <<- Points.DistanceMetric.Pythagoras.derivfunc
-        Points.DistanceMetric.DissimilarityMatrix <<- Points.DistanceMetric.func(Biplot.Xtransformed)
+        Points.DissimilarityMetric.func <<- Points.DissimilarityMetric.Pythagoras.func
+        Points.DissimilarityMetric.derivfunc <<- Points.DissimilarityMetric.Pythagoras.derivfunc
+        Points.DissimilarityMetric.DissimilarityMatrix <<- Points.DissimilarityMetric.func(Biplot.Xtransformed)
         if (FollowThrough) 
-            Points.DistanceMetric.FollowThrough.cmd()
+            Points.DissimilarityMetric.FollowThrough.cmd()
     }
-    Points.DistanceMetric.SquareRootOfManhattan.func <- function(X, 
+    Points.DissimilarityMetric.SquareRootOfManhattan.func <- function(X, 
         Y) {
         if (missing(Y)) 
             as.matrix(dist(X, method = "manhattan"))^0.5
         else rowSums(abs(sweep(Y, 2, X, "-")))^0.5
     }
-    Points.DistanceMetric.SquareRootOfManhattan.derivfunc <- NULL
-    Points.DistanceMetric.SquareRootOfManhattan.cmd <- function(FollowThrough = TRUE) {
+    Points.DissimilarityMetric.SquareRootOfManhattan.derivfunc <- NULL
+    Points.DissimilarityMetric.SquareRootOfManhattan.cmd <- function(FollowThrough = TRUE) {
         if (tclvalue(Points.var) == "0" && tclvalue(Biplot.Axes.var) %in% 
             c("0", "1", "2")) 
             Biplot.Axes.var <<- tclVar("13")
@@ -3558,13 +3630,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "14")) 
             Biplot.Axes.var <<- tclVar("11")
         Points.skipped <<- FALSE
-        Points.DistanceMetric.func <<- Points.DistanceMetric.SquareRootOfManhattan.func
-        Points.DistanceMetric.derivfunc <<- Points.DistanceMetric.SquareRootOfManhattan.func
-        Points.DistanceMetric.DissimilarityMatrix <<- Points.DistanceMetric.func(Biplot.Xtransformed)
+        Points.DissimilarityMetric.func <<- Points.DissimilarityMetric.SquareRootOfManhattan.func
+        Points.DissimilarityMetric.derivfunc <<- Points.DissimilarityMetric.SquareRootOfManhattan.func
+        Points.DissimilarityMetric.DissimilarityMatrix <<- Points.DissimilarityMetric.func(Biplot.Xtransformed)
         if (FollowThrough) 
-            Points.DistanceMetric.FollowThrough.cmd()
+            Points.DissimilarityMetric.FollowThrough.cmd()
     }
-    Points.DistanceMetric.Clark.func <- function(X, Y) {
+    Points.DissimilarityMetric.Clark.func <- function(X, Y) {
         if (missing(Y)) {
             n <- nrow(X)
             distmat2 <- matrix(0, nrow = n, ncol = n)
@@ -3579,8 +3651,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             rowSums(temp1^2)^0.5
         }
     }
-    Points.DistanceMetric.Clark.derivfunc <- NULL
-    Points.DistanceMetric.Clark.cmd <- function(FollowThrough = TRUE) {
+    Points.DissimilarityMetric.Clark.derivfunc <- NULL
+    Points.DissimilarityMetric.Clark.cmd <- function(FollowThrough = TRUE) {
         if (tclvalue(Points.var) == "0" && tclvalue(Biplot.Axes.var) %in% 
             c("0", "1", "2")) 
             Biplot.Axes.var <<- tclVar("13")
@@ -3589,13 +3661,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "14")) 
             Biplot.Axes.var <<- tclVar("11")
         Points.skipped <<- FALSE
-        Points.DistanceMetric.func <<- Points.DistanceMetric.Clark.func
-        Points.DistanceMetric.derivfunc <<- Points.DistanceMetric.Clark.derivfunc
-        Points.DistanceMetric.DissimilarityMatrix <<- Points.DistanceMetric.func(Biplot.Xtransformed)
+        Points.DissimilarityMetric.func <<- Points.DissimilarityMetric.Clark.func
+        Points.DissimilarityMetric.derivfunc <<- Points.DissimilarityMetric.Clark.derivfunc
+        Points.DissimilarityMetric.DissimilarityMatrix <<- Points.DissimilarityMetric.func(Biplot.Xtransformed)
         if (FollowThrough) 
-            Points.DistanceMetric.FollowThrough.cmd()
+            Points.DissimilarityMetric.FollowThrough.cmd()
     }
-    Points.DistanceMetric.Mahalanobis.func <- function(X, Y) {
+    Points.DissimilarityMetric.Mahalanobis.func <- function(X, 
+        Y) {
         temp1 <- svd(cov(Biplot.Xtransformed))
         temp2 <- temp1$u %*% diag(temp1$d^-0.5) %*% temp1$v
         temp3 <- X %*% temp2
@@ -3603,8 +3676,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             as.matrix(dist(temp3))
         else PythagorasDistance(temp3, Y %*% temp2)
     }
-    Points.DistanceMetric.Mahalanobis.derivfunc <- NULL
-    Points.DistanceMetric.Mahalanobis.cmd <- function(FollowThrough = TRUE) {
+    Points.DissimilarityMetric.Mahalanobis.derivfunc <- NULL
+    Points.DissimilarityMetric.Mahalanobis.cmd <- function(FollowThrough = TRUE) {
         if (tclvalue(Points.var) == "0" && tclvalue(Biplot.Axes.var) %in% 
             c("0", "1", "2", "11", "12", "13", "14")) 
             Biplot.Axes.var <<- tclVar("10")
@@ -3613,47 +3686,36 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "14")) 
             Biplot.Axes.var <<- tclVar("11")
         Points.skipped <<- FALSE
-        Points.DistanceMetric.func <<- Points.DistanceMetric.Mahalanobis.func
-        Points.DistanceMetric.derivfunc <<- Points.DistanceMetric.Mahalanobis.derivfunc
-        Points.DistanceMetric.DissimilarityMatrix <<- Points.DistanceMetric.func(Biplot.Xtransformed)
+        Points.DissimilarityMetric.func <<- Points.DissimilarityMetric.Mahalanobis.func
+        Points.DissimilarityMetric.derivfunc <<- Points.DissimilarityMetric.Mahalanobis.derivfunc
+        Points.DissimilarityMetric.DissimilarityMatrix <<- Points.DissimilarityMetric.func(Biplot.Xtransformed)
         if (FollowThrough) 
-            Points.DistanceMetric.FollowThrough.cmd()
-    }
-    Points.DistanceMetric.var <- tclVar("0")
-    Points.DistanceMetric.func <- NULL
-    Points.DistanceMetric.derivfunc <- NULL
-    Points.DistanceMetric.DissimilarityMatrix <- NULL
-    Points.DistanceMetric.DisparityMatrix <- NULL
-    Points.DistanceMetric.DistanceMatrix <- NULL
-    Points.DistanceMetric.FollowThrough.cmd <- function() {
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 2/6 * 
-            100)
-        .Tcl("update")
-        switch(tclvalue(Points.var), "0" = Points.PCO.cmd(), 
-            "10" = Points.MDS.IdentityTransformation.cmd(), "11" = Points.MDS.MonotoneRegression.cmd(), 
-            "12" = Points.MDS.MonotoneSplineTransformation.autcmd())
+            Points.DissimilarityMetric.FollowThrough.cmd()
     }
     Points.PCO.cmd <- function(FollowThrough = TRUE) {
-        if (tclvalue(Points.DistanceMetric.var) == "0" && tclvalue(Biplot.Axes.var) %in% 
-            c("0", "1", "2")) 
-            Biplot.Axes.var <<- tclVar("11")
-        if (tclvalue(Points.DistanceMetric.var) %in% c("1", "2") && 
+        if (tclvalue(Points.DissimilarityMetric.var) == "0" && 
             tclvalue(Biplot.Axes.var) %in% c("0", "1", "2")) 
+            Biplot.Axes.var <<- tclVar("11")
+        if (tclvalue(Points.DissimilarityMetric.var) %in% c("1", 
+            "2") && tclvalue(Biplot.Axes.var) %in% c("0", "1", 
+            "2")) 
             Biplot.Axes.var <<- tclVar("13")
-        if (tclvalue(Points.DistanceMetric.var) == "3" && tclvalue(Biplot.Axes.var) %in% 
-            c("0", "1", "2", "11", "12", "13", "14")) 
+        if (tclvalue(Points.DissimilarityMetric.var) == "3" && 
+            tclvalue(Biplot.Axes.var) %in% c("0", "1", "2", "11", 
+                "12", "13", "14")) 
             Biplot.Axes.var <<- tclVar("10")
         Points.MDS.ApproachToTies.var <<- tclVar("-1")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
         }
         temp0 <- matrix(0, nrow = n.in, ncol = n.in)
         temp0[cbind(1:n.in, 1:n.in)] <- 1
         temp0 <- temp0 - 1/n.in
-        Bpco <- -0.5 * temp0 %*% (Points.DistanceMetric.DissimilarityMatrix^2) %*% 
+        Bpco <- -0.5 * temp0 %*% (Points.DissimilarityMetric.DissimilarityMatrix^2) %*% 
             temp0
         temp1 <- eigen(Bpco, symmetric = TRUE)
         temp1$vectors <- (apply(temp1$vectors, 2, function(x) x * 
@@ -3662,8 +3724,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             "*")
         Biplot.Y3D <<- Biplot.Yfull[, 1:3]
         Biplot.Y <<- Biplot.Yfull[, 1:2]
-        Points.DistanceMetric.DisparityMatrix <<- Points.DistanceMetric.DissimilarityMatrix
-        Points.DistanceMetric.DistanceMatrix <<- as.matrix(dist(Biplot.Y))
+        Points.DissimilarityMetric.DisparityMatrix <<- Points.DissimilarityMetric.DissimilarityMatrix
+        Points.DissimilarityMetric.DistanceMatrix <<- as.matrix(dist(Biplot.Y))
         samples.in.PreviousScaling <<- samples.in
         PointsTab.update <<- TRUE
         if (FollowThrough) 
@@ -3671,13 +3733,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     }
     Points.MDS.cmd <- function() {
         Identity <- function(DissMat, Y, WeightMat) {
-            Points.DistanceMetric.DistanceMatrix <<- as.matrix(dist(Y))
+            Points.DissimilarityMetric.DistanceMatrix <<- as.matrix(dist(Y))
             DissMat
         }
         MonotoneRegression <- function(DissMat, Y, WeightMat) {
             diss <- DissMat[lower.tri(DissMat)]
-            Points.DistanceMetric.DistanceMatrix <<- as.matrix(dist(Y))
-            dist <- Points.DistanceMetric.DistanceMatrix[lower.tri(Points.DistanceMetric.DistanceMatrix)]
+            Points.DissimilarityMetric.DistanceMatrix <<- as.matrix(dist(Y))
+            dist <- Points.DissimilarityMetric.DistanceMatrix[lower.tri(Points.DissimilarityMetric.DistanceMatrix)]
             disp <- dist[order(diss, dist)]
             disp0 <- disp
             if (tclvalue(Points.MDS.ApproachToTies.var) == "1" && 
@@ -3713,8 +3775,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             M <- Points.MDS.SplineM
             initb <- runif(ncol(M))
             diss <- DissMat[lower.tri(DissMat)]
-            Points.DistanceMetric.DistanceMatrix <<- as.matrix(dist(Y))
-            dist <- Points.DistanceMetric.DistanceMatrix[lower.tri(Points.DistanceMetric.DistanceMatrix)][order(diss)]
+            Points.DissimilarityMetric.DistanceMatrix <<- as.matrix(dist(Y))
+            dist <- Points.DissimilarityMetric.DistanceMatrix[lower.tri(Points.DissimilarityMetric.DistanceMatrix)][order(diss)]
             b <- oldb <- initb
             for (i in 1:boptions$MDS.MaximumIterations) {
                 for (j in 1:length(b)) {
@@ -3722,7 +3784,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   b[j] <- max(0, sum(M[, j] * r)/sum(M[, j]^2))
                 }
                 if (max(abs(b - oldb)) < boptions$MDS.convergence || 
-                  ControlButtons.Stop.var) 
+                  Other.Stop.var) 
                   break
                 oldb <- b
             }
@@ -3734,7 +3796,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 DispMat^2)/2)^0.5
         }
         if (is.null(Biplot.Y)) {
-            Bpco <- -0.5 * (diag(n.in) - 1/n.in) %*% (Points.DistanceMetric.DissimilarityMatrix^2) %*% 
+            Bpco <- -0.5 * (diag(n.in) - 1/n.in) %*% (Points.DissimilarityMetric.DissimilarityMatrix^2) %*% 
                 (diag(n.in) - 1/n.in)
             temp1 <- eigen(Bpco)
             temp1$vectors <- (apply(temp1$vectors, 2, function(x) x * 
@@ -3764,13 +3826,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             vscale = BiplotRegion.VerticalScale.func())
         .Tcl("update")
         Transformation <- function(Y) switch(tclvalue(Points.var), 
-            "10" = Identity(Points.DistanceMetric.DissimilarityMatrix, 
-                Y, WeightMat), "11" = MonotoneRegression(Points.DistanceMetric.DissimilarityMatrix, 
-                Y, WeightMat), "12" = MonotoneSpline(Points.DistanceMetric.DissimilarityMatrix, 
+            `10` = Identity(Points.DissimilarityMetric.DissimilarityMatrix, 
+                Y, WeightMat), `11` = MonotoneRegression(Points.DissimilarityMetric.DissimilarityMatrix, 
+                Y, WeightMat), `12` = MonotoneSpline(Points.DissimilarityMetric.DissimilarityMatrix, 
                 Y, WeightMat))
-        if (!identical(Points.DistanceMetric.DissimilarityMatrix, 
-            t(Points.DistanceMetric.DissimilarityMatrix))) 
-            stop("`Points.DistanceMetric.DissimilarityMatrix' is required to be symmetric.")
+        if (!identical(Points.DissimilarityMetric.DissimilarityMatrix, 
+            t(Points.DissimilarityMetric.DissimilarityMatrix))) 
+            stop("`Points.DissimilarityMetric.DissimilarityMatrix' is required to be symmetric.")
         if (!identical(WeightMat, t(WeightMat))) 
             stop("`WeightMat' is required to be symmetric.")
         Wupper <- WeightMat
@@ -3787,21 +3849,21 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             0.5 * sum(WeightMat * (DispMat - as.matrix(dist(Y)))^2)
         }
         Z <- Yinitial
-        Points.DistanceMetric.DisparityMatrix <<- Transformation(Z)
+        Points.DissimilarityMetric.DisparityMatrix <<- Transformation(Z)
         ConvergenceTab.points.StressVector <<- Stressfunc(Z, 
-            Points.DistanceMetric.DisparityMatrix)
+            Points.DissimilarityMetric.DisparityMatrix)
         betahat <- 1
-        ControlButtons.Stop.var <<- FALSE
-        tkconfigure(ControlButtons.Stop.but, state = "normal")
+        Other.Stop.var <<- FALSE
+        tkconfigure(Other.Stop.but, state = "normal")
         tcl(DiagnosticTabs.nb, "tab", 0, state = "normal")
         for (i in 1:boptions$MDS.MaximumIterations) {
-            Biplot.Y <<- ginv(V) %*% Bfunc(Z, Points.DistanceMetric.DisparityMatrix) %*% 
+            Biplot.Y <<- ginv(V) %*% Bfunc(Z, Points.DissimilarityMetric.DisparityMatrix) %*% 
                 Z
-            Points.DistanceMetric.DisparityMatrix <<- Transformation(Biplot.Y)
+            Points.DissimilarityMetric.DisparityMatrix <<- Transformation(Biplot.Y)
             ConvergenceTab.points.StressVector <<- c(ConvergenceTab.points.StressVector, 
-                Stressfunc(Biplot.Y, Points.DistanceMetric.DisparityMatrix))
-            if (tclvalue(ControlButtons.LiveUpdates.var) == "1" && 
-                i%%boptions$IterationsToLiveUpdate == 0) {
+                Stressfunc(Biplot.Y, Points.DissimilarityMetric.DisparityMatrix))
+            if (tclvalue(Other.LiveUpdates.var) == "1" && i%%boptions$IterationsToLiveUpdate == 
+                0) {
                 if (tclvalue(Additional.ConvexHull.var) == "1") 
                   Additional.ConvexHull.autcmd()
                 if (tclvalue(Additional.AlphaBag.var) == "1") 
@@ -3825,11 +3887,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 1] - ConvergenceTab.points.StressVector[length(ConvergenceTab.points.StressVector)])/ConvergenceTab.points.StressVector[length(ConvergenceTab.points.StressVector) - 
                 1]
             if (stresschange > 0 & stresschange < boptions$MDS.convergence || 
-                ControlButtons.Stop.var) 
+                Other.Stop.var) 
                 break
             Z <- Biplot.Y
         }
-        tkconfigure(ControlButtons.Stop.but, state = "disabled")
+        tkconfigure(Other.Stop.but, state = "disabled")
         if (tclvalue(Points.MDS.InTermsOfPrincipalAxes.var) == 
             "1") {
             mu <- colMeans(Biplot.Y)
@@ -3839,23 +3901,26 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 sign(x[which.max(abs(x))])))
             Biplot.Y <<- Biplot.Y %*% temp1$vectors + mu
         }
-        Points.DistanceMetric.DistanceMatrix <<- as.matrix(dist(Biplot.Y))
+        Points.DissimilarityMetric.DistanceMatrix <<- as.matrix(dist(Biplot.Y))
         samples.in.PreviousScaling <<- samples.in
         ConvergenceTab.update <<- TRUE
         PointsTab.update <<- TRUE
     }
-    Points.MDS.RandomInitialConfiguration.var <- tclVar("0")
-    Points.MDS.algorithm.var <- tclVar("0")
+    Points.MDS.Run.cmd <- function(FollowThrough = TRUE) {
+        switch(tclvalue(Points.var), `10` = Points.MDS.IdentityTransformation.cmd(), 
+            `11` = Points.MDS.MonotoneRegression.cmd(), `12` = Points.MDS.MonotoneSplineTransformation.autcmd())
+    }
     Points.MDS.IdentityTransformation.cmd <- function(FollowThrough = TRUE) {
         if (tclvalue(Biplot.Axes.var) %in% c("0", "1", "2", "13", 
             "14")) 
             Biplot.Axes.var <<- tclVar("11")
         Points.MDS.ApproachToTies.var <<- tclVar("-1")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
         }
         Points.MDS.cmd()
         if (FollowThrough) 
@@ -3867,10 +3932,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Biplot.Axes.var <<- tclVar("11")
         Points.MDS.ApproachToTies.var <<- tclVar("0")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
         }
         Points.MDS.cmd()
         if (FollowThrough) 
@@ -3880,6 +3946,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Points.MDS.MonotoneSplineTransformation.degree <- 2
     Points.MDS.SplineM <- NULL
     Points.MDS.MonotoneSplineTransformation.cmd <- function() {
+        if (tclvalue(Biplot.Axes.var) %in% c("0", "1", "2", "13", 
+            "14")) 
+            Biplot.Axes.var <<- tclVar("11")
+        Points.MDS.ApproachToTies.var <<- tclVar("-1")
         local.GUI.func <- function() {
             top <- tktoplevel()
             tkwm.withdraw(top)
@@ -3910,14 +3980,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onDefault)
             tkplace(frame1, relx = 0.5, rely = 0.4, relwidth = 0.9, 
                 relheight = 0.5, anchor = "center")
-            tkplace(label1, relx = 0.05, rely = 0.25, "in" = frame1, 
+            tkplace(label1, relx = 0.05, rely = 0.25, `in` = frame1, 
                 anchor = "w")
             tkplace(spinbox1, relx = 0.8, rely = 0.25, relwidth = 0.15, 
-                "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.05, rely = 0.7, "in" = frame1, 
+                `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.05, rely = 0.7, `in` = frame1, 
                 anchor = "w")
             tkplace(spinbox2, relx = 0.8, rely = 0.7, relwidth = 0.15, 
-                "in" = frame1, anchor = "w")
+                `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.95, rely = 0.85, anchor = "e")
             tkplace(button3, relx = 0.05, rely = 0.85, anchor = "w")
             tkbind(top, "<Return>", onOK)
@@ -3943,15 +4013,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Points.MDS.MonotoneSplineTransformation.autcmd()
     }
     Points.MDS.MonotoneSplineTransformation.autcmd <- function(FollowThrough = TRUE) {
-        if (tclvalue(Biplot.Axes.var) %in% c("0", "1", "2", "13", 
-            "14")) 
-            Biplot.Axes.var <<- tclVar("11")
-        Points.MDS.ApproachToTies.var <<- tclVar("-1")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
         }
         k <- Points.MDS.MonotoneSplineTransformation.AllKnots - 
             2
@@ -3991,22 +4058,29 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             M <- cbind(1, M)
             Points.MDS.SplineM <<- M
         }
-        MonotoneSplineSetup(Points.DistanceMetric.DissimilarityMatrix)
+        MonotoneSplineSetup(Points.DissimilarityMetric.DissimilarityMatrix)
         Points.MDS.cmd()
         if (FollowThrough) 
             Points.FollowThrough.cmd()
     }
     Points.MDS.ApproachToTies.var <- tclVar("-1")
+    Points.MDS.RandomInitialConfiguration.var <- tclVar("0")
     Points.MDS.InTermsOfPrincipalAxes.var <- tclVar("0")
-    Points.var <- tclVar("0")
-    Points.skipped <- FALSE
-    Points.FollowThrough.cmd <- function() {
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 3/6 * 
-            100)
+    Biplot.Axes.var <- tclVar("0")
+    Biplot.Axes.FollowThrough.cmd <- function() {
+        tkconfigure(Other.ProgressBar.pb, value = 4/6 * 100)
         .Tcl("update")
-        switch(tclvalue(Biplot.Axes.var), "10" = Axes.None.cmd(), 
-            "11" = Axes.Regression.cmd(), "12" = Axes.Procrustes.cmd(), 
-            "13" = Axes.CircularNonLinear.cmd())
+        if (tclvalue(Additional.Interpolate.ANewSample.var) == 
+            "1") 
+            Additional.Interpolate.ANewSample.autcmd()
+        if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
+            "1") 
+            Additional.Interpolate.SampleGroupMeans.autcmd()
+        if (tclvalue(Additional.ConvexHull.var) == "1") 
+            Additional.ConvexHull.autcmd()
+        if (tclvalue(Additional.AlphaBag.var) == "1") 
+            Additional.AlphaBag.autcmd()
+        Additional.FollowThrough.cmd()
     }
     Axes.None.cmd <- function(FollowThrough = TRUE) {
         View.ClipAround.var <<- tclVar("0")
@@ -4015,14 +4089,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Additional.Interpolate.SampleGroupMeans.var <<- tclVar("0")
         Additional.ClassificationRegion.var <<- tclVar("0")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
-            switch(tclvalue(Points.var), "0" = Points.PCO.cmd(FALSE), 
-                "10" = Points.MDS.IdentityTransformation.cmd(FALSE), 
-                "11" = Points.MDS.MonotoneRegression.cmd(FALSE), 
-                "12" = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.var), `0` = Points.PCO.cmd(FALSE), 
+                `10` = Points.MDS.IdentityTransformation.cmd(FALSE), 
+                `11` = Points.MDS.MonotoneRegression.cmd(FALSE), 
+                `12` = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
         }
         Biplot.title <<- Axes.None.title
         if (Biplot.zoom.mode == 0) 
@@ -4034,8 +4109,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Axes.None.plot
         Biplot.predictions <<- Axes.None.predictions
         Biplot.interpolate <<- Axes.None.interpolate
-        Biplot.OverAxis <<- Axes.None.OverAxis
         Biplot.motion <<- Axes.None.motion
+        Biplot.OverAxis <<- Axes.None.OverAxis
         Biplot.LeftClick <<- Axes.None.LeftClick
         Biplot.LeftRelease <<- Axes.None.LeftRelease
         Biplot.DoubleLeftClick <<- Axes.None.DoubleLeftClick
@@ -4119,7 +4194,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 .labels = temp.labels, labels.cex = temp.labels.cex, 
                 HorizOffset = temp.HorizOffset, VertOffset = temp.VertOffset))
         do.call("mynewplot", arglist)
-        if (tclvalue(View.ShowDisplaySpaceAxes.var) == "1") {
+        if (tclvalue(View.CalibrateDisplaySpaceAxes.var) == "1") {
             axis(side = 1, cex.axis = 0.75)
             axis(side = 2, cex.axis = 0.75)
         }
@@ -4139,8 +4214,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tclvalue(Additional.ClassificationRegion.var) == 
                 "0") 
             Biplot.plot.ConvexHullAlphaBag.bg()
-        if (tclvalue(ControlButtons.HidePoints.var) == "0" && 
-            tclvalue(View.ShowPointLabels.var) == "1") 
+        if (tclvalue(Other.HidePoints.var) == "0" && tclvalue(View.ShowPointLabels.var) == 
+            "1") 
             text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                 strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                 Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -4148,7 +4223,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 labels = bparp$points.label.text[samples.in], 
                 font = bparp$points.label.font[samples.in], cex = bparp$points.label.cex[samples.in], 
                 col = bparp$points.label.col[samples.in])
-        if (tclvalue(ControlButtons.HidePoints.var) == "0") 
+        if (tclvalue(Other.HidePoints.var) == "0") 
             points(Y, pch = bparp$points.pch[samples.in], cex = bparp$points.cex[samples.in], 
                 col = bparp$points.col.fg[samples.in], bg = bparp$points.col.bg[samples.in])
         if (tclvalue(Additional.ConvexHull.var) == "1" || tclvalue(Additional.AlphaBag.var) == 
@@ -4176,7 +4251,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     }
     Axes.None.predictions <- function() NULL
     Axes.None.interpolate <- function() NULL
-    Axes.None.OverAxis <- function() NULL
     Axes.None.motion <- function(x, y) {
         if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
             Y <- Biplot.Y_
@@ -4199,6 +4273,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
         }
     }
+    Axes.None.OverAxis <- function() NULL
     Axes.None.LeftClick <- function(x, y) {
         Biplot.XY.move <<- Biplot.XY.RightClick <<- Biplot.ConvertCoordinates(x, 
             y)
@@ -4249,7 +4324,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         rgl.bg(sphere = TRUE, color = c("whitesmoke", "gray90"), 
             lit = FALSE)
         rgl.light()
-        if (tclvalue(ControlButtons.HidePoints.var) == "0") {
+        if (tclvalue(Other.HidePoints.var) == "0") {
             for (temp1 in groups.in) {
                 temp1b <- group[samples.in] == levels(group[samples.in])[temp1]
                 points3d(Y3D[temp1b, 1], Y3D[temp1b, 2], Y3D[temp1b, 
@@ -4297,14 +4372,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             View.AxisLabels.var <<- tclVar("1")
         Additional.ClassificationRegion.var <<- tclVar("0")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
-            switch(tclvalue(Points.var), "0" = Points.PCO.cmd(FALSE), 
-                "10" = Points.MDS.IdentityTransformation.cmd(FALSE), 
-                "11" = Points.MDS.MonotoneRegression.cmd(FALSE), 
-                "12" = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.var), `0` = Points.PCO.cmd(FALSE), 
+                `10` = Points.MDS.IdentityTransformation.cmd(FALSE), 
+                `11` = Points.MDS.MonotoneRegression.cmd(FALSE), 
+                `12` = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
         }
         Axes.Regression.determine()
         Biplot.title <<- Axes.Regression.title
@@ -4317,8 +4393,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Axes.Regression.plot
         Biplot.predictions <<- Axes.Regression.predictions
         Biplot.interpolate <<- Axes.Regression.interpolate
-        Biplot.OverAxis <<- Axes.Regression.OverAxis
         Biplot.motion <<- Axes.Regression.motion
+        Biplot.OverAxis <<- Axes.Regression.OverAxis
         Biplot.LeftClick <<- Axes.Regression.LeftClick
         Biplot.LeftRelease <<- Axes.Regression.LeftRelease
         Biplot.DoubleLeftClick <<- Axes.Regression.DoubleLeftClick
@@ -4340,9 +4416,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Axes.Regression.plot <- function(screen = TRUE) Biplot.linear.plot(screen)
     Axes.Regression.predictions <- function() Biplot.linear.predictions()
     Axes.Regression.interpolate <- function(ToInterpolate) Biplot.linear.interpolate(ToInterpolate)
-    Axes.Regression.OverAxis <- function() Biplot.linear.OverAxis()
     Axes.Regression.motion <- function(x, y) Biplot.general.motion(x, 
         y)
+    Axes.Regression.OverAxis <- function() Biplot.linear.OverAxis()
     Axes.Regression.LeftClick <- function(x, y) Biplot.general.LeftClick(x, 
         y)
     Axes.Regression.DoubleLeftClick <- NULL
@@ -4357,14 +4433,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             View.AxisLabels.var <<- tclVar("1")
         Additional.ClassificationRegion.var <<- tclVar("0")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
-            switch(tclvalue(Points.var), "0" = Points.PCO.cmd(FALSE), 
-                "10" = Points.MDS.IdentityTransformation.cmd(FALSE), 
-                "11" = Points.MDS.MonotoneRegression.cmd(FALSE), 
-                "12" = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.var), `0` = Points.PCO.cmd(FALSE), 
+                `10` = Points.MDS.IdentityTransformation.cmd(FALSE), 
+                `11` = Points.MDS.MonotoneRegression.cmd(FALSE), 
+                `12` = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
         }
         Axes.Procrustes.determine()
         Biplot.title <<- Axes.Procrustes.title
@@ -4377,8 +4454,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Axes.Procrustes.plot
         Biplot.predictions <<- Axes.Procrustes.predictions
         Biplot.interpolate <<- Axes.Procrustes.interpolate
-        Biplot.OverAxis <<- Axes.Procrustes.OverAxis
         Biplot.motion <<- Axes.Procrustes.motion
+        Biplot.OverAxis <<- Axes.Procrustes.OverAxis
         Biplot.LeftClick <<- Axes.Procrustes.LeftClick
         Biplot.LeftRelease <<- Axes.Procrustes.LeftRelease
         Biplot.DoubleLeftClick <<- Axes.Procrustes.DoubleLeftClick
@@ -4415,9 +4492,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 Y %*% t(Y) %*% X)))^2/(sum(diag(t(X) %*% X)) * 
                 sum(diag(t(Y) %*% Y)))
             if (detail) 
-                list(Y = Y, "Matched X" = Xnew, "R squared" = Rsquared, 
-                  Translate = translate, "Reflection/rotation matrix A" = A, 
-                  "Isotropic dilation rho" = rho)
+                list(Y = Y, `Matched X` = Xnew, `R squared` = Rsquared, 
+                  Translate = translate, `Reflection/rotation matrix A` = A, 
+                  `Isotropic dilation rho` = rho)
         }
         temp1 <- 2
         X <- Xold <- Biplot.Xtransformed
@@ -4435,7 +4512,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 sum((X[, -(1:temp1)] - Y[, -(1:temp1)])^2))
             if (abs(ConvergenceTab.axes.StressVector[length(ConvergenceTab.axes.StressVector) - 
                 1] - ConvergenceTab.axes.StressVector[length(ConvergenceTab.axes.StressVector)]) < 
-                boptions$Procrustes.convergence || ControlButtons.Stop.var) 
+                boptions$Procrustes.convergence || Other.Stop.var) 
                 break
             Y[, -(1:temp1)] <- X[, -(1:temp1)]
         }
@@ -4454,13 +4531,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Biplot.Binterpolate <<- Axes.Procrustes.determine.interpolative()[[1]]
         }
         else {
-            ControlButtons.Stop.var <<- FALSE
-            tkconfigure(ControlButtons.Stop.but, state = "normal")
+            Other.Stop.var <<- FALSE
+            tkconfigure(Other.Stop.but, state = "normal")
             temp1 <- Axes.Procrustes.determine.interpolative()
             Biplot.B <<- temp1[[1]]
             Biplot.B3D <<- temp1[[2]]
             Biplot.Binterpolate <<- Biplot.B
-            tkconfigure(ControlButtons.Stop.but, state = "disabled")
+            tkconfigure(Other.Stop.but, state = "disabled")
         }
     }
     Axes.Procrustes.layout <- NULL
@@ -4473,9 +4550,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         temp2 <- sweep(B, 1, temp1, "*")
         colSums(temp2)
     }
-    Axes.Procrustes.OverAxis <- function() Biplot.linear.OverAxis()
     Axes.Procrustes.motion <- function(x, y) Biplot.general.motion(x, 
         y)
+    Axes.Procrustes.OverAxis <- function() Biplot.linear.OverAxis()
     Axes.Procrustes.LeftClick <- function(x, y) Biplot.general.LeftClick(x, 
         y)
     Axes.Procrustes.LeftRelease <- function(x, y) Biplot.general.LeftRelease(x, 
@@ -4489,14 +4566,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             View.AxisLabels.var <<- tclVar("2")
         Additional.ClassificationRegion.var <<- tclVar("0")
         if (Points.skipped) {
-            switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(FALSE), 
-                "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(FALSE), 
-                "2" = Points.DistanceMetric.Clark.cmd(FALSE), 
-                "3" = Points.DistanceMetric.Mahalanobis.cmd(FALSE))
-            switch(tclvalue(Points.var), "0" = Points.PCO.cmd(FALSE), 
-                "10" = Points.MDS.IdentityTransformation.cmd(FALSE), 
-                "11" = Points.MDS.MonotoneRegression.cmd(FALSE), 
-                "12" = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = Points.DissimilarityMetric.Pythagoras.cmd(FALSE), 
+                `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(FALSE), 
+                `2` = Points.DissimilarityMetric.Clark.cmd(FALSE), 
+                `3` = Points.DissimilarityMetric.Mahalanobis.cmd(FALSE))
+            switch(tclvalue(Points.var), `0` = Points.PCO.cmd(FALSE), 
+                `10` = Points.MDS.IdentityTransformation.cmd(FALSE), 
+                `11` = Points.MDS.MonotoneRegression.cmd(FALSE), 
+                `12` = Points.MDS.MonotoneSplineTransformation.autcmd(FALSE))
         }
         Axes.CircularNonLinear.determine()
         if (Axes.CircularNonLinear.NotEmbeddable) {
@@ -4513,8 +4591,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.plot <<- Axes.CircularNonLinear.plot
         Biplot.predictions <<- Axes.CircularNonLinear.predictions
         Biplot.interpolate <<- Axes.CircularNonLinear.interpolate
-        Biplot.OverAxis <<- Axes.CircularNonLinear.OverAxis
         Biplot.motion <<- Axes.CircularNonLinear.motion
+        Biplot.OverAxis <<- Axes.CircularNonLinear.OverAxis
         Biplot.LeftClick <<- Axes.CircularNonLinear.LeftClick
         Biplot.LeftRelease <<- Axes.CircularNonLinear.LeftRelease
         Biplot.DoubleLeftClick <<- Axes.CircularNonLinear.DoubleLeftClick
@@ -4531,7 +4609,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             I <- diag(1, nrow = n.in, ncol = n.in)
             one <- rep(1, n.in)
             N <- (one %*% t(one))/n.in
-            Delta <- Points.DistanceMetric.func(Biplot.Xtransformed)^2
+            Delta <- Points.DissimilarityMetric.func(Biplot.Xtransformed)^2
             D <- -0.5 * Delta
             B <- (I - N) %*% D %*% (I - N)
             eigenB <- eigen(B, symmetric = TRUE)
@@ -4556,15 +4634,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             derivat <- function(x.vec, mu) {
                 n <- length(x.vec)
                 antw <- rep(NA, n)
-                if (tclvalue(Points.DistanceMetric.var) == "1") {
+                if (tclvalue(Points.DissimilarityMetric.var) == 
+                  "1") {
                   afgeleide.funksie <- TRUE
                   antw <- 1/2 * sign(x.vec - mu)
                 }
-                if (tclvalue(Points.DistanceMetric.var) == "0") {
+                if (tclvalue(Points.DissimilarityMetric.var) == 
+                  "0") {
                   afgeleide.funksie <- TRUE
                   antw <- (x.vec - mu)
                 }
-                if (tclvalue(Points.DistanceMetric.var) == "2") {
+                if (tclvalue(Points.DissimilarityMetric.var) == 
+                  "2") {
                   afgeleide.funksie <- TRUE
                   antw <- 2 * x.vec * ((x.vec - mu)/(x.vec + 
                     mu)^3)
@@ -4586,7 +4667,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 markers <- zapsmall(seq(PrettyMarkers[1], PrettyMarkers[length(PrettyMarkers)], 
                   by = PrettyMarkersIncrement/boptions$axes.tick.inter.n[variables.in[j]]))
                 PrettyMarkers <- PrettyMarkersTemp
-                ttemp <- max(max(nchar(as.character(abs(PrettyMarkers) - 
+                ttemp <- max(max(nchar(format(abs(PrettyMarkers) - 
                   trunc(abs(PrettyMarkers))))) - 2, 0)
                 PrettyMarkersCharacter <- format(PrettyMarkers, 
                   nsmall = ttemp, trim = TRUE)
@@ -4614,20 +4695,20 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 lambda.inv <- diag(lambda.diag.inv)
                 B.inv <- U %*% (lambda.inv^2) %*% t(U)
                 dd <- rep(0, n.in)
-                dd13 <- switch(tclvalue(Points.DistanceMetric.var), 
-                  "0" = apply(Xmat, 1, function(x) sum(x^2)) - 
+                dd13 <- switch(tclvalue(Points.DissimilarityMetric.var), 
+                  `0` = apply(Xmat, 1, function(x) sum(x^2)) - 
                     apply(Xmat, 1, function(x, j) x[j]^2, j = j), 
-                  "1" = apply(Xmat, 1, function(x) sum(abs(x))) - 
+                  `1` = apply(Xmat, 1, function(x) sum(abs(x))) - 
                     apply(Xmat, 1, function(x, j) abs(x[j]), 
-                      j = j), "2" = apply(Xmat, 1, function(x) sum((x/x)^2)) - 
+                      j = j), `2` = apply(Xmat, 1, function(x) sum((x/x)^2)) - 
                     apply(Xmat, 1, function(x, j) (x[j]/x[j])^2, 
                       j = j))
                 for (mu in axis.vals) {
-                  dd <- dd13 + switch(tclvalue(Points.DistanceMetric.var), 
-                    "0" = apply(Xmat, 1, function(x, mu, j) (x[j] - 
-                      mu)^2, mu = mu, j = j), "1" = apply(Xmat, 
+                  dd <- dd13 + switch(tclvalue(Points.DissimilarityMetric.var), 
+                    `0` = apply(Xmat, 1, function(x, mu, j) (x[j] - 
+                      mu)^2, mu = mu, j = j), `1` = apply(Xmat, 
                       1, function(x, mu, j) abs(x[j] - mu), mu = mu, 
-                      j = j), "2" = apply(Xmat, 1, function(x, 
+                      j = j), `2` = apply(Xmat, 1, function(x, 
                       mu, j) ((x[j] - mu)/(x[j] + mu))^2, mu = mu, 
                       j = j))
                   dd <- -0.5 * dd
@@ -4755,9 +4836,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
     }
     Axes.CircularNonLinear.interpolate <- function(ToInterpolate) Biplot.NonLinear.interpolate(ToInterpolate)
-    Axes.CircularNonLinear.OverAxis <- function() Biplot.NonLinear.OverAxis()
     Axes.CircularNonLinear.motion <- function(x, y) Biplot.general.motion(x, 
         y)
+    Axes.CircularNonLinear.OverAxis <- function() Biplot.NonLinear.OverAxis()
     Axes.CircularNonLinear.LeftClick <- function(x, y) Biplot.general.LeftClick(x, 
         y)
     Axes.CircularNonLinear.LeftRelease <- function(x, y) Biplot.general.LeftRelease(x, 
@@ -4769,37 +4850,34 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Axes.CircularNonLinear.plot3D <- function() Biplot.NonLinear.plot3D()
     Axes.Default.cmd <- function() {
         if (tclvalue(Points.var) == "0") 
-            switch(tclvalue(Points.DistanceMetric.var), "0" = {
-                Biplot.Axes.var <<- tclVar("11")
-                Axes.Regression.cmd()
-            }, "1" = {
-                Biplot.Axes.var <<- tclVar("13")
-                Axes.CircularNonLinear.cmd()
-            }, "2" = {
-                Biplot.Axes.var <<- tclVar("13")
-                Axes.CircularNonLinear.cmd()
-            }, "3" = {
-                Biplot.Axes.var <<- tclVar("10")
-                Axes.None.cmd()
-            })
+            switch(tclvalue(Points.DissimilarityMetric.var), 
+                `0` = {
+                  Biplot.Axes.var <<- tclVar("11")
+                  Axes.Regression.cmd()
+                }, `1` = {
+                  Biplot.Axes.var <<- tclVar("13")
+                  Axes.CircularNonLinear.cmd()
+                }, `2` = {
+                  Biplot.Axes.var <<- tclVar("13")
+                  Axes.CircularNonLinear.cmd()
+                }, `3` = {
+                  Biplot.Axes.var <<- tclVar("10")
+                  Axes.None.cmd()
+                })
         else Axes.Regression.cmd()
     }
-    Biplot.Axes.var <- tclVar("0")
-    Biplot.Axes.FollowThrough.cmd <- function() {
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 4/6 * 
-            100)
+    Additional.FollowThrough.cmd <- function() {
+        tkconfigure(Other.ProgressBar.pb, value = 5/6 * 100)
         .Tcl("update")
-        if (tclvalue(Additional.Interpolate.ANewSample.var) == 
-            "1") 
-            Additional.Interpolate.ANewSample.autcmd()
-        if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
-            "1") 
-            Additional.Interpolate.SampleGroupMeans.autcmd()
-        if (tclvalue(Additional.ConvexHull.var) == "1") 
-            Additional.ConvexHull.autcmd()
-        if (tclvalue(Additional.AlphaBag.var) == "1") 
-            Additional.AlphaBag.autcmd()
-        Additional.FollowThrough.cmd()
+        Biplot.replot()
+        if (ConvergenceTab.update) 
+            ConvergenceTab.replot()
+        if (PointsTab.update) 
+            PointsTab.replot()
+        if (GroupsTab.update) 
+            GroupsTab.replot()
+        if (AxesTab.update) 
+            AxesTab.replot()
     }
     Additional.Interpolate.ANewSample.cmd <- function() {
         local.GUI.func <- function() {
@@ -4863,26 +4941,26 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 local.ANewSample.label.VertOffset.var <- tclVar(bpar$ANewSample.label.VertOffset)
                 frame_1 <- tkwidget(top_, "TitleFrame", text = "Plotting character")
                 tkplace(frame_1, relx = 0.05, relwidth = 0.9, 
-                  y = 10, height = 105, "in" = top_)
+                  y = 10, height = 105, `in` = top_)
                 tkplace(tk2label(frame_1, text = "Symbol"), x = 11, 
-                  y = 20, "in" = frame_1)
+                  y = 20, `in` = frame_1)
                 spinbox_1 <- tkwidget(frame_1, "SpinBox", textvariable = local.ANewSample.pch.var, 
                   editable = FALSE, values = c(" ", "NA", 0:25), 
                   justify = "right")
                 tkplace(spinbox_1, relx = 0.95, y = 20, height = 18, 
-                  relwidth = 0.125, "in" = frame_1, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_1, anchor = "ne")
                 tkplace(tk2label(frame_1, text = "Size"), x = 11, 
-                  y = 40, "in" = frame_1)
+                  y = 40, `in` = frame_1)
                 entry_1 <- tk2entry(frame_1, textvariable = local.ANewSample.cex.var, 
                   justify = "right", takefocus = FALSE)
                 tkplace(entry_1, relx = 0.95, y = 40, height = 18, 
-                  relwidth = 0.125, "in" = frame_1, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_1, anchor = "ne")
                 tkplace(tk2label(frame_1, text = "Foreground colour"), 
-                  x = 11, y = 60, "in" = frame_1)
+                  x = 11, y = 60, `in` = frame_1)
                 label_1 <- tklabel(frame_1, background = local.ANewSample.col.fg.var, 
                   relief = "groove", borderwidth = "1.5p")
                 tkplace(label_1, relx = 0.95, y = 60, height = 18, 
-                  relwidth = 0.125, "in" = frame_1, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_1, anchor = "ne")
                 tkbind(label_1, "<Button-1>", function() {
                   temp1 <- tkchooseColor(initialcolor = local.ANewSample.col.fg.var)
                   if (!(tclvalue(temp1) == "")) {
@@ -4892,11 +4970,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   }
                 })
                 tkplace(tk2label(frame_1, text = "Background colour"), 
-                  x = 11, y = 80, "in" = frame_1)
+                  x = 11, y = 80, `in` = frame_1)
                 label_2 <- tklabel(frame_1, background = local.ANewSample.col.bg.var, 
                   relief = "groove", borderwidth = "1.5p")
                 tkplace(label_2, relx = 0.95, y = 80, height = 18, 
-                  relwidth = 0.125, "in" = frame_1, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_1, anchor = "ne")
                 tkbind(label_2, "<Button-1>", function() {
                   temp1 <- tkchooseColor(initialcolor = local.ANewSample.col.bg.var)
                   if (!(tclvalue(temp1) == "")) {
@@ -4907,25 +4985,25 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 })
                 frame_2 <- tkwidget(top_, "TitleFrame", text = "Label")
                 tkplace(frame_2, relx = 0.05, relwidth = 0.9, 
-                  y = 130, height = 125, "in" = top_)
+                  y = 130, height = 125, `in` = top_)
                 tkplace(tk2label(frame_2, text = "Font"), x = 11, 
-                  y = 20, "in" = frame_2)
+                  y = 20, `in` = frame_2)
                 spinbox_2 <- tkwidget(frame_2, "SpinBox", textvariable = local.ANewSample.label.font.var, 
                   editable = FALSE, values = c(" ", 1:4), justify = "right")
                 tkplace(spinbox_2, relx = 0.95, y = 20, height = 18, 
-                  relwidth = 0.125, "in" = frame_2, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_2, anchor = "ne")
                 tkplace(tk2label(frame_2, text = "Size"), x = 11, 
-                  y = 40, "in" = frame_2)
+                  y = 40, `in` = frame_2)
                 entry_2 <- tk2entry(frame_2, textvariable = local.ANewSample.label.cex.var, 
                   justify = "right", takefocus = FALSE)
                 tkplace(entry_2, relx = 0.95, y = 40, height = 18, 
-                  relwidth = 0.125, "in" = frame_2, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_2, anchor = "ne")
                 tkplace(tk2label(frame_2, text = "Colour"), x = 11, 
-                  y = 60, "in" = frame_2)
+                  y = 60, `in` = frame_2)
                 label_3 <- tklabel(frame_2, background = local.ANewSample.label.col.var, 
                   relief = "groove", borderwidth = "1.5p")
                 tkplace(label_3, relx = 0.95, y = 60, height = 18, 
-                  relwidth = 0.125, "in" = frame_2, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_2, anchor = "ne")
                 tkbind(label_3, "<Button-1>", function() {
                   temp1 <- tkchooseColor(initialcolor = local.ANewSample.label.col.var)
                   if (!(tclvalue(temp1) == "")) {
@@ -4935,17 +5013,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   }
                 })
                 tkplace(tk2label(frame_2, text = "Horizontal offset"), 
-                  x = 11, y = 80, "in" = frame_2)
+                  x = 11, y = 80, `in` = frame_2)
                 entry_3 <- tk2entry(frame_2, textvariable = local.ANewSample.label.HorizOffset.var, 
                   justify = "right", takefocus = FALSE)
                 tkplace(entry_3, relx = 0.95, y = 80, height = 18, 
-                  relwidth = 0.125, "in" = frame_2, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_2, anchor = "ne")
                 tkplace(tk2label(frame_2, text = "Vertical offset"), 
-                  x = 11, y = 100, "in" = frame_2)
+                  x = 11, y = 100, `in` = frame_2)
                 entry_4 <- tk2entry(frame_2, textvariable = local.ANewSample.label.VertOffset.var, 
                   justify = "right", takefocus = FALSE)
                 tkplace(entry_4, relx = 0.95, y = 100, height = 18, 
-                  relwidth = 0.125, "in" = frame_2, anchor = "ne")
+                  relwidth = 0.125, `in` = frame_2, anchor = "ne")
                 button_1 <- tk2button(top_, text = "Defaults", 
                   width = 10, command = onDefaults_)
                 button_2 <- tk2button(top_, text = "OK", width = 10, 
@@ -5009,18 +5087,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(entry1, relx = 0.57, y = 18, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.02, y = 38, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.02, y = 38, `in` = frame1, 
                 anchor = "w")
             tkplace(entry2, relx = 0.57, y = 38, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label3, relx = 0.02, y = 58, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label3, relx = 0.02, y = 58, `in` = frame1, 
                 anchor = "w")
             tkplace(checkbutton1, relx = 0.91, y = 58, height = 17, 
-                "in" = frame1, anchor = "w")
+                `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button2, relx = 0.24, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
@@ -5112,14 +5190,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(combo1, relx = 0.57, y = 18, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.02, y = 38, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.02, y = 38, `in` = frame1, 
                 anchor = "w")
             tkplace(checkbutton1, relx = 0.91, y = 38, height = 17, 
-                "in" = frame1, anchor = "w")
+                `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button2, relx = 0.24, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
@@ -5148,7 +5226,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
             "1") {
             Additional.Interpolate.SampleGroupMeans.label.text <<- switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-                "-1" = "All samples", "0" = if (g == 1) 
+                `-1` = "All samples", `0` = if (g == 1) 
                   "All samples"
                 else bpar$groups.label.text[groups.in], bpar$groups.label.text[Additional.Interpolate.SampleGroupMeans.for])
             Additional.Interpolate.SampleGroupMeans.autcmd()
@@ -5167,8 +5245,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             if (substr(tclvalue(tkget(SettingsBox.transformation.combo)), 
                 start = 1, stop = 3) == "Log") {
                 Additional.Interpolate.SampleGroupMeans.coordinates <<- switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-                  "-1" = matrix(Biplot.interpolate(exp(colMeans(log(Data[samples.in, 
-                    variables.in])))), ncol = 2), "0" = t(apply(exp(apply(log(Data[samples.in, 
+                  `-1` = matrix(Biplot.interpolate(exp(colMeans(log(Data[samples.in, 
+                    variables.in])))), ncol = 2), `0` = t(apply(exp(apply(log(Data[samples.in, 
                     variables.in]), 2, function(x) tapply(x, 
                     factor(group[samples.in], exclude = NULL), 
                     mean))), 1, Biplot.interpolate)), matrix(Biplot.interpolate(exp(colMeans(log(Data[samples.in[as.numeric(group[samples.in]) == 
@@ -5177,8 +5255,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             }
             else {
                 Additional.Interpolate.SampleGroupMeans.coordinates <<- switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-                  "-1" = matrix(Biplot.interpolate(colMeans(Data[samples.in, 
-                    variables.in])), ncol = 2), "0" = t(apply(apply(Data[samples.in, 
+                  `-1` = matrix(Biplot.interpolate(colMeans(Data[samples.in, 
+                    variables.in])), ncol = 2), `0` = t(apply(apply(Data[samples.in, 
                     variables.in], 2, function(x) tapply(x, factor(group[samples.in], 
                     exclude = NULL), mean)), 1, Biplot.interpolate)), 
                   matrix(Biplot.interpolate(colMeans(Data[samples.in[as.numeric(group[samples.in]) == 
@@ -5240,10 +5318,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(combo1, relx = 0.57, y = 18, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
+                height = 17, `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button2, relx = 0.24, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
@@ -5280,8 +5358,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Y <- Biplot.Y_
         else Y <- Biplot.Y
         switch(as.character(Additional.ConvexHullAlphaBag.for), 
-            "-1" = Additional.ConvexHullAlphaBag.coordinates <<- list(Y[c(temp1 <- chull(Y), 
-                temp1[1]), ]), "0" = Additional.ConvexHullAlphaBag.coordinates <<- tapply(1:n.in, 
+            `-1` = Additional.ConvexHullAlphaBag.coordinates <<- list(Y[c(temp1 <- chull(Y), 
+                temp1[1]), ]), `0` = Additional.ConvexHullAlphaBag.coordinates <<- tapply(1:n.in, 
                 factor(group[samples.in], exclude = NULL), function(x) Y[x[c(temp1 <- chull(Y[x, 
                   ]), temp1[1])], ]), {
                 temp1 <- which(as.numeric(group[samples.in]) == 
@@ -5367,22 +5445,22 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(combo1, relx = 0.57, y = 18, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.02, y = 38, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.02, y = 38, `in` = frame1, 
                 anchor = "w")
             tkplace(entry1, relx = 0.825, y = 38, relwidth = 0.145, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label3, relx = 0.02, y = 58, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label3, relx = 0.02, y = 58, `in` = frame1, 
                 anchor = "w")
-            tkplace(checkbutton1, relx = 0.91, y = 58, "in" = frame1, 
+            tkplace(checkbutton1, relx = 0.91, y = 58, `in` = frame1, 
                 anchor = "w")
-            tkplace(label4, relx = 0.02, y = 78, "in" = frame1, 
+            tkplace(label4, relx = 0.02, y = 78, `in` = frame1, 
                 anchor = "w")
             tkplace(checkbutton2, relx = 0.91, y = 78, height = 17, 
-                "in" = frame1, anchor = "w")
+                `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button2, relx = 0.24, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
@@ -5411,7 +5489,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Additional.ConvexHullAlphaBag.FirstRun <<- TRUE
         if (tclvalue(Additional.AlphaBag.var) == "1") {
             Additional.ConvexHullAlphaBag.TukeyMedian.label.text <<- switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                "-1" = "All points", "0" = if (g == 1) 
+                `-1` = "All points", `0` = if (g == 1) 
                   "All points"
                 else bpar$groups.label.text[groups.in], bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])
             Additional.AlphaBag.autcmd()
@@ -5476,14 +5554,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Y <- Biplot.Y_
         else Y <- Biplot.Y
         switch(as.character(Additional.ConvexHullAlphaBag.for), 
-            "-1" = {
+            `-1` = {
                 temp1 <- CalculateAlphaBag(as.matrix(Y[, 1]), 
                   as.matrix(Y[, 2]), Additional.ConvexHullAlphaBag.alpha * 
                     100, "All points")
                 Additional.ConvexHullAlphaBag.coordinates <<- list(temp1[[1]])
                 Additional.ConvexHullAlphaBag.TukeyMedian.coordinates <<- matrix(temp1[[2]], 
                   ncol = 2)
-            }, "0" = {
+            }, `0` = {
                 Additional.ConvexHullAlphaBag.coordinates <<- vector(length = g.in, 
                   mode = "list")
                 Additional.ConvexHullAlphaBag.TukeyMedian.coordinates <<- matrix(nrow = g.in, 
@@ -5580,18 +5658,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(combo1, relx = 0.57, y = 18, relwidth = 0.4, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.02, y = 38, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.02, y = 38, `in` = frame1, 
                 anchor = "w")
             tkplace(combo2, relx = 0.77, y = 38, relwidth = 0.2, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label3, relx = 0.02, y = 58, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label3, relx = 0.02, y = 58, `in` = frame1, 
                 anchor = "w")
             tkplace(entry1, relx = 0.87, y = 58, relwidth = 0.1, 
-                height = 17, "in" = frame1, anchor = "w")
+                height = 17, `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
             tkplace(button4, relx = 0.955, rely = 0.89, anchor = "e")
@@ -5615,22 +5693,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             rm(Rico)
             tkwait.window(top)
         }
-        if (data.class(try(.find.package("KernSmooth"), TRUE)) == 
-            "try-error" || data.class(try(.find.package("vcd"), 
-            TRUE)) == "try-error") {
-            tkmessageBox(title = "Point densities", parent = GUI.TopLevel, 
-                message = "This option requires the `KernSmooth' and `vcd' packages. \nPlease download and install.", 
-                icon = "info", type = "ok")
-            tkfocus(GUI.TopLevel)
-            Additional.PointDensities.var <<- tclVar("0")
-        }
-        else {
-            require("KernSmooth", quietly = TRUE)
-            require("vcd", quietly = TRUE)
-            Additional.PointDensities.var <<- tclVar("1")
-            Additional.ClassificationRegion.var <<- tclVar("0")
-            local.GUI.func()
-        }
+        Additional.PointDensities.var <<- tclVar("1")
+        Additional.ClassificationRegion.var <<- tclVar("0")
+        local.GUI.func()
         if (tclvalue(Additional.PointDensities.var) != "1") 
             Additional.PointDensities.estimate <<- NULL
     }
@@ -5651,10 +5716,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 (Biplot.par$usr[4] - Biplot.par$usr[3])/20), 
             gridsize = c(51, 51), range.x = temp1)
         temp2 <- switch(as.character(Additional.PointDensities.palette), 
-            "-1" = {
+            `-1` = {
                 rev(terrain_hcl(Additional.PointDensities.NumberOfColours, 
                   c. = c(50, 0), l = c(70, 100)))
-            }, "0" = rev(heat_hcl(Additional.PointDensities.NumberOfColours, 
+            }, `0` = rev(heat_hcl(Additional.PointDensities.NumberOfColours, 
                 c. = c(50, 0), l = c(70, 100))), {
                 temp3 <- seq(from = 0, to = 360, length.out = 10)[-c(0, 
                   10)]
@@ -5675,7 +5740,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             top <- tktoplevel()
             tkwm.withdraw(top)
             onDefault <- function() {
-                NewDimensions <<- p.in
+                NewDimensions <<- 2
                 tkconfigure(combo1, text = NewDimensions)
                 NewPixels <<- tclVar(150)
                 tkconfigure(entry1, textvariable = NewPixels)
@@ -5684,12 +5749,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 Format.ByGroup.cmd(WhichTabInitially = 4)
             }
             onOK <- function() {
-                Additional.ClassificationRegion.dimensions <<- which(tclvalue(tkget(combo1)) == 
-                  DimensionsPossibilities)
-                bpar$ClassificationRegion.PixelsPerBiplotDimension <<- round(as.numeric(tclvalue(NewPixels)), 
-                  0)
-                Additional.ClassificationRegion.var <<- tclVar("1")
-                tkdestroy(top)
+                if (which(tclvalue(tkget(combo1)) == DimensionsPossibilities) == 
+                  2) {
+                  Additional.ClassificationRegion.dimensions <<- which(tclvalue(tkget(combo1)) == 
+                    DimensionsPossibilities)
+                  bpar$ClassificationRegion.PixelsPerBiplotDimension <<- round(as.numeric(tclvalue(NewPixels)), 
+                    0)
+                  Additional.ClassificationRegion.var <<- tclVar("1")
+                  tkdestroy(top)
+                }
+                else {
+                  Additional.ClassificationRegion.dimensions <<- which(tclvalue(tkget(combo1)) == 
+                    DimensionsPossibilities)
+                  bpar$ClassificationRegion.PixelsPerBiplotDimension <<- round(as.numeric(tclvalue(NewPixels)), 
+                    0)
+                  Additional.ClassificationRegion.var <<- tclVar("1")
+                  tkdestroy(top)
+                }
             }
             onOff <- function() {
                 tkdestroy(top)
@@ -5715,14 +5791,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 command = onOff)
             tkplace(frame1, relx = 0.5, rely = 0.1, relwidth = 0.92, 
                 height = 100, anchor = "n")
-            tkplace(label1, relx = 0.02, y = 18, "in" = frame1, 
+            tkplace(label1, relx = 0.02, y = 18, `in` = frame1, 
                 anchor = "w")
             tkplace(combo1, relx = 0.77, y = 18, relwidth = 0.2, 
-                height = 17, "in" = frame1, anchor = "w")
-            tkplace(label2, relx = 0.02, y = 38, "in" = frame1, 
+                height = 17, `in` = frame1, anchor = "w")
+            tkplace(label2, relx = 0.02, y = 38, `in` = frame1, 
                 anchor = "w")
             tkplace(entry1, relx = 0.77, y = 38, relwidth = 0.2, 
-                height = 18, "in" = frame1, anchor = "w")
+                height = 18, `in` = frame1, anchor = "w")
             tkplace(button1, relx = 0.035, rely = 0.89, anchor = "w")
             tkplace(button2, relx = 0.24, rely = 0.89, anchor = "w")
             tkplace(button3, relx = 0.75, rely = 0.89, anchor = "e")
@@ -5755,31 +5831,48 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
     }
     Additional.ClassificationRegion.var <- tclVar("0")
-    Additional.ClassificationRegion.dimensions <- p
+    Additional.ClassificationRegion.dimensions <- 2
     Additional.ClassificationRegion.autcmd <- function(FollowThrough = TRUE) {
-        xseq <- seq(Biplot.par$usr[1], Biplot.par$usr[2], length = bpar$ClassificationRegion.PixelsPerBiplotDimension)
-        yseq <- seq(Biplot.par$usr[3], Biplot.par$usr[4], length = bpar$ClassificationRegion.PixelsPerBiplotDimension)
-        if (Additional.ClassificationRegion.dimensions == 1) 
-            L <- as.matrix(xseq)
-        else if (Additional.ClassificationRegion.dimensions == 
-            2) 
-            L <- cbind(rep(xseq, each = length(yseq)), rep(yseq, 
-                length(xseq)))
-        else L <- cbind(rep(xseq, each = length(yseq)), rep(yseq, 
-            length(xseq)), matrix(0, nrow = bpar$ClassificationRegion.PixelsPerBiplotDimension^2, 
-            ncol = Additional.ClassificationRegion.dimensions - 
-                2))
-        dd <- PythagorasDistance(apply(Biplot.Xtransformed, 2, 
-            function(x) tapply(x, factor(group[samples.in], exclude = NULL), 
-                mean)) %*% Biplot.Bclassify[, 1:Additional.ClassificationRegion.dimensions], 
-            L)
-        class.region <- matrix(apply(dd, 2, which.min), byrow = TRUE, 
-            nrow = length(xseq))
-        if (Additional.ClassificationRegion.dimensions == 1) 
-            image(xseq, yseq, matrix(class.region, nrow = length(class.region), 
-                ncol = bpar$ClassificationRegion.PixelsPerBiplotDimension), 
-                add = TRUE, col = bpar$gClassificationRegion.col.bg)
-        else image(xseq, yseq, class.region, add = TRUE, col = bpar$gClassificationRegion.col.bg)
+        if (Additional.ClassificationRegion.dimensions == 2) {
+            temp1 <- apply(Biplot.Xtransformed, 2, function(x) tapply(x, 
+                factor(group[samples.in], exclude = NULL), mean)) %*% 
+                Biplot.Bclassify[, 1:2]
+            temp2 <- deldir(temp1[, 1], temp1[, 2], rw = c(Biplot.par$usr[1], 
+                Biplot.par$usr[2], Biplot.par$usr[3], Biplot.par$usr[4]))
+            my.plot.tile.list(tile.list(temp2), polycol = bpar$gClassificationRegion.col.bg, 
+                close = TRUE, asp = NA, pch = NA)
+        }
+        else {
+            xseq <- seq(Biplot.par$usr[1], Biplot.par$usr[2], 
+                length = bpar$ClassificationRegion.PixelsPerBiplotDimension)
+            yseq <- seq(Biplot.par$usr[3], Biplot.par$usr[4], 
+                length = bpar$ClassificationRegion.PixelsPerBiplotDimension)
+            if (Additional.ClassificationRegion.dimensions == 
+                1) 
+                L <- as.matrix(xseq)
+            else if (Additional.ClassificationRegion.dimensions == 
+                2) 
+                L <- cbind(rep(xseq, each = length(yseq)), rep(yseq, 
+                  length(xseq)))
+            else L <- cbind(rep(xseq, each = length(yseq)), rep(yseq, 
+                length(xseq)), matrix(0, nrow = bpar$ClassificationRegion.PixelsPerBiplotDimension^2, 
+                ncol = Additional.ClassificationRegion.dimensions - 
+                  2))
+            dd <- PythagorasDistance(apply(Biplot.Xtransformed, 
+                2, function(x) tapply(x, factor(group[samples.in], 
+                  exclude = NULL), mean)) %*% Biplot.Bclassify[, 
+                1:Additional.ClassificationRegion.dimensions], 
+                L)
+            class.region <- matrix(apply(dd, 2, which.min), byrow = TRUE, 
+                nrow = length(xseq))
+            if (Additional.ClassificationRegion.dimensions == 
+                1) 
+                image(xseq, yseq, matrix(class.region, nrow = length(class.region), 
+                  ncol = bpar$ClassificationRegion.PixelsPerBiplotDimension), 
+                  add = TRUE, col = bpar$gClassificationRegion.col.bg)
+            else image(xseq, yseq, class.region, add = TRUE, 
+                col = bpar$gClassificationRegion.col.bg)
+        }
     }
     Additional.ClearAll.cmd <- function(FollowThrough = TRUE) {
         Additional.Interpolate.ANewSample.var <<- tclVar("0")
@@ -5789,20 +5882,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Additional.PointDensities.var <<- tclVar("0")
         Additional.ClassificationRegion.var <<- tclVar("0")
     }
-    Additional.FollowThrough.cmd <- function() {
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 5/6 * 
-            100)
-        .Tcl("update")
-        Biplot.replot()
-        if (ConvergenceTab.update) 
-            ConvergenceTab.replot()
-        if (PointsTab.update) 
-            PointsTab.replot()
-        if (GroupsTab.update) 
-            GroupsTab.replot()
-        if (AxesTab.update) 
-            AxesTab.replot()
-    }
     Help.Manual.cmd <- function() {
         shell.exec(as.character(paste(system.file(package = "BiplotGUI"), 
             "/doc/BiplotGUIManual.pdf", sep = "")))
@@ -5810,21 +5889,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     Help.HomePage.cmd <- function() {
         shell.exec("http://biplotgui.r-forge.r-project.org")
     }
-    Help.ReportABug.cmd <- function() {
-        shell.exec("http://r-forge.r-project.org/tracker/?group_id=225")
-    }
     Help.ShowPopUpHelp.var <- tclVar("0")
     Help.ShowPopUpHelp.cmd <- function() {
         if (tclvalue(Help.ShowPopUpHelp.var) == "1") {
             mytktip(BiplotRegion.image, "The biplot in the biplot region. For context-specific options, right click on a point, on an axis, on empty space inside the biplot, or outside the biplot. Points and axes may be temporarily removed from consideration by dragging them from the biplot into the kraal.")
-            mytktip(ControlButtons.frame, "Other")
-            mytktip(ControlButtons.External.but, "Display the current biplot region in an external window.")
-            mytktip(ControlButtons.Hide.but, "Hide or unhide components of the current biplot.")
-            mytktip(ControlButtons.LiveUpdates.chk, "Toggle between showing periodic live updates of the biplot region and diagnostic graphs while iterating, and showing a single update after the final iteration. Applicable to MDS and interpolative Procrustes. Showing live updates may impair performance, especially when many additional descriptors are shown.")
-            mytktip(ControlButtons.Stop.but, "Stop iterating and proceed with the current ordination. Applicable to MDS and interpolative Procrustes.")
-            mytktip(ControlButtons.ReturnPoints.but, "Return all points currently in the kraal to the biplot.")
-            mytktip(ControlButtons.ReturnAxes.but, "Return all axes currently in the kraal to the biplot.")
-            mytktip(ControlButtons.ReturnAll.but, "Return all points and axes currently in the kraal to the biplot.")
+            mytktip(Other.frame, "Other")
+            mytktip(Other.External.but, "Display the current biplot region in an external window.")
+            mytktip(Other.Hide.but, "Hide or unhide components of the current biplot.")
+            mytktip(Other.LiveUpdates.chk, "Toggle between showing periodic live updates of the biplot region and diagnostic graphs while iterating, and showing a single update after the final iteration. Applicable to MDS and interpolative Procrustes. Showing live updates may impair performance, especially when many additional descriptors are shown.")
+            mytktip(Other.Stop.but, "Stop iterating and proceed with the current ordination. Applicable to MDS and interpolative Procrustes.")
+            mytktip(Other.ReturnPoints.but, "Return all points currently in the kraal to the biplot.")
+            mytktip(Other.ReturnAxes.but, "Return all axes currently in the kraal to the biplot.")
+            mytktip(Other.ReturnAll.but, "Return all points and axes currently in the kraal to the biplot.")
             mytktip(SettingsBox.frame, "The settings box")
             mytktip(SettingsBox.transformation.combo, "Select a data transformation. All biplots are based on the transformed data, but the biplot axes are always calibrated in terms of the units of the original variables. 'Centre' sets variable means to zero; 'scale' sets variable standard deviations to one; `unitise' sets variable maxima to one and variable minima to zero; `log' is the natural logarithm. Components of the transformation are performed in the order in which they are listed. Data are always centred. Log-transformations are available only when the non-kraal variable values of the non-kraal samples are all positive.")
             mytktip(SettingsBox.action.combo, "Select the desired action of the biplot axes.")
@@ -5840,15 +5916,15 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         else {
             mytktip(BiplotRegion.image, "")
-            mytktip(ControlButtons.frame, "")
-            mytktip(ControlButtons.External.but, "")
-            mytktip(ControlButtons.Hide.but, "")
-            mytktip(ControlButtons.ProgressBar.pb, "")
-            mytktip(ControlButtons.LiveUpdates.chk, "")
-            mytktip(ControlButtons.Stop.but, "")
-            mytktip(ControlButtons.ReturnPoints.but, "")
-            mytktip(ControlButtons.ReturnAxes.but, "")
-            mytktip(ControlButtons.ReturnAll.but, "")
+            mytktip(Other.frame, "")
+            mytktip(Other.External.but, "")
+            mytktip(Other.Hide.but, "")
+            mytktip(Other.ProgressBar.pb, "")
+            mytktip(Other.LiveUpdates.chk, "")
+            mytktip(Other.Stop.but, "")
+            mytktip(Other.ReturnPoints.but, "")
+            mytktip(Other.ReturnAxes.but, "")
+            mytktip(Other.ReturnAll.but, "")
             mytktip(SettingsBox.frame, "")
             mytktip(SettingsBox.transformation.combo, "")
             mytktip(SettingsBox.action.combo, "")
@@ -5863,7 +5939,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     }
     Help.About.cmd <- function() {
         tkmessageBox(title = "About", parent = GUI.TopLevel, 
-            message = "Anthony la Grange\n<amlg at sun.ac.za>\n\nVersion 0.0-2\n\nDistributed under the GPL-3 license available from \nhttp://www.r-project.org/Licenses/", 
+            message = "Anthony la Grange\n<amlg at sun.ac.za>\n\nVersion 0.0-4\n\nDistributed under the GPL-3 license available from \nhttp://www.r-project.org/Licenses/", 
             icon = "info", type = "ok")
     }
     MenuBar.menu <- tk2menu(GUI.TopLevel)
@@ -5942,14 +6018,20 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(MenuBar.File, "cascade", label = "Save as", underline = "0", 
         accelerator = "Ctrl+S", menu = MenuBar.File.SaveAs)
     tkadd(MenuBar.File, "command", label = "Copy", underline = "0", 
-        accelerator = "Ctrl+C", command = function() {
+        accelerator = "Ctrl+C", state = if (.Platform$OS.type != 
+            "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Copy.cmd()
             GUI.BindingsOn()
         })
     tkadd(MenuBar.File, "separator")
     tkadd(MenuBar.File, "command", label = "Print...", underline = "0", 
-        accelerator = "Ctrl-P", command = function() {
+        accelerator = "Ctrl-P", state = if (.Platform$OS.type != 
+            "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Print.cmd()
             GUI.BindingsOn()
@@ -5962,7 +6044,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GUI.BindingsOn()
         })
     tkadd(MenuBar.File, "separator")
-    tkadd(MenuBar.File, "command", label = "Exit...", underline = "1", 
+    tkadd(MenuBar.File, "command", label = "Exit", underline = "1", 
         command = function() {
             GUI.BindingsOff()
             File.Exit.cmd()
@@ -6050,21 +6132,21 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(MenuBar.View, "command", label = "Show next legend entries", 
         underline = "5", accelerator = "Ctrl++", command = function() {
             GUI.BindingsOff()
-            Legend.NextPage.cmd()
+            View.ShowNextLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(MenuBar.View, "command", label = "Show previous legend entries", 
         underline = "5", accelerator = "Ctrl+-", command = function() {
             GUI.BindingsOff()
-            Legend.PrevPage.cmd()
+            View.ShowPreviousLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(MenuBar.View, "separator")
     tkadd(MenuBar.View, "checkbutton", label = "Calibrate display space axes", 
-        underline = "6", variable = View.ShowDisplaySpaceAxes.var, 
+        underline = "6", variable = View.CalibrateDisplaySpaceAxes.var, 
         command = function() {
             GUI.BindingsOff()
-            View.ShowDisplaySpaceAxes.cmd()
+            View.CalibrateDisplaySpaceAxes.cmd()
             GUI.BindingsOn()
         })
     tkadd(MenuBar.menu, "cascade", label = "View", underline = "0", 
@@ -6137,37 +6219,39 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(MenuBar.menu, "cascade", label = "Joint", underline = "0", 
         menu = MenuBar.Joint)
     MenuBar.Points <- tk2menu(MenuBar.menu, tearoff = FALSE)
-    MenuBar.Points.DistanceMetric <- tk2menu(MenuBar.menu, tearoff = FALSE)
-    tkadd(MenuBar.Points.DistanceMetric, "radiobutton", label = "Pythagoras", 
-        underline = "0", variable = Points.DistanceMetric.var, 
+    MenuBar.Points.DissimilarityMetric <- tk2menu(MenuBar.menu, 
+        tearoff = FALSE)
+    tkadd(MenuBar.Points.DissimilarityMetric, "radiobutton", 
+        label = "Pythagoras", underline = "0", variable = Points.DissimilarityMetric.var, 
         value = "0", command = function() {
             GUI.BindingsOff()
-            Points.DistanceMetric.Pythagoras.cmd()
+            Points.DissimilarityMetric.Pythagoras.cmd()
             GUI.BindingsOn()
         })
-    tkadd(MenuBar.Points.DistanceMetric, "radiobutton", label = "Square-root-of-Manhattan", 
-        underline = "0", variable = Points.DistanceMetric.var, 
-        value = "1", command = function() {
+    tkadd(MenuBar.Points.DissimilarityMetric, "radiobutton", 
+        label = "Square-root-of-Manhattan", underline = "0", 
+        variable = Points.DissimilarityMetric.var, value = "1", 
+        command = function() {
             GUI.BindingsOff()
-            Points.DistanceMetric.SquareRootOfManhattan.cmd()
+            Points.DissimilarityMetric.SquareRootOfManhattan.cmd()
             GUI.BindingsOn()
         })
-    tkadd(MenuBar.Points.DistanceMetric, "radiobutton", label = "Clark", 
-        underline = "0", variable = Points.DistanceMetric.var, 
+    tkadd(MenuBar.Points.DissimilarityMetric, "radiobutton", 
+        label = "Clark", underline = "0", variable = Points.DissimilarityMetric.var, 
         value = "2", command = function() {
             GUI.BindingsOff()
-            Points.DistanceMetric.Clark.cmd()
+            Points.DissimilarityMetric.Clark.cmd()
             GUI.BindingsOn()
         })
-    tkadd(MenuBar.Points.DistanceMetric, "radiobutton", label = "Mahalanobis", 
-        underline = "0", variable = Points.DistanceMetric.var, 
+    tkadd(MenuBar.Points.DissimilarityMetric, "radiobutton", 
+        label = "Mahalanobis", underline = "0", variable = Points.DissimilarityMetric.var, 
         value = "3", command = function() {
             GUI.BindingsOff()
-            Points.DistanceMetric.Mahalanobis.cmd()
+            Points.DissimilarityMetric.Mahalanobis.cmd()
             GUI.BindingsOn()
         })
-    tkadd(MenuBar.Points, "cascade", label = "Distance metric", 
-        underline = "0", menu = MenuBar.Points.DistanceMetric)
+    tkadd(MenuBar.Points, "cascade", label = "Dissimilarity metric", 
+        underline = "0", menu = MenuBar.Points.DissimilarityMetric)
     tkadd(MenuBar.Points, "separator")
     tkadd(MenuBar.Points, "radiobutton", label = "PCO", underline = "0", 
         variable = Points.var, value = "0", accelerator = "A", 
@@ -6177,8 +6261,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GUI.BindingsOn()
         })
     MenuBar.Points.MDS <- tk2menu(MenuBar.menu, tearoff = FALSE)
-    tkadd(MenuBar.Points.MDS, "checkbutton", label = "Random initial configuration", 
-        underline = "0", variable = Points.MDS.RandomInitialConfiguration.var)
+    tkadd(MenuBar.Points.MDS, "command", label = "Run", underline = "0", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Points.MDS.Run.cmd(FollowThrough = TRUE)
+            GUI.BindingsOn()
+        })
     tkadd(MenuBar.Points.MDS, "separator")
     tkadd(MenuBar.Points.MDS, "radiobutton", label = "Identity transformation", 
         underline = "0", variable = Points.var, value = "10", 
@@ -6209,6 +6297,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         underline = "24", variable = Points.MDS.ApproachToTies.var, 
         value = "1")
     tkadd(MenuBar.Points.MDS, "separator")
+    tkadd(MenuBar.Points.MDS, "checkbutton", label = "Random initial configuration", 
+        underline = "1", variable = Points.MDS.RandomInitialConfiguration.var)
     tkadd(MenuBar.Points.MDS, "checkbutton", label = "In terms of principal axes", 
         underline = "12", variable = Points.MDS.InTermsOfPrincipalAxes.var)
     tkadd(MenuBar.Points, "cascade", label = "MDS", underline = "0", 
@@ -6286,7 +6376,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         })
     tkadd(MenuBar.Additional, "checkbutton", label = "Alpha-bags...", 
         underline = "0", variable = Additional.AlphaBag.var, 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             Additional.AlphaBag.cmd()
             Biplot.replot()
@@ -6323,11 +6415,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         menu = MenuBar.Additional)
     MenuBar.Help <- tk2menu(MenuBar.menu, tearoff = FALSE)
     tkadd(MenuBar.Help, "command", label = "Manual (in PDF)", 
-        underline = "0", accelerator = "F1", command = Help.Manual.cmd)
+        underline = "0", accelerator = "F1", state = if (.Platform$OS.type != 
+            "windows") 
+            "disabled"
+        else "normal", command = Help.Manual.cmd)
     tkadd(MenuBar.Help, "command", label = "Home page", underline = "0", 
-        command = Help.HomePage.cmd)
-    tkadd(MenuBar.Help, "command", label = "Report a bug", underline = "0", 
-        command = Help.ReportABug.cmd)
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = Help.HomePage.cmd)
     tkadd(MenuBar.Help, "separator")
     tkadd(MenuBar.Help, "checkbutton", label = "Show pop-up help", 
         underline = "6", variable = Help.ShowPopUpHelp.var, command = function() {
@@ -6345,7 +6440,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     BiplotRegion.frame <- tkframe(GUI.TopLevel, relief = "groove", 
         borderwidth = "1.5p")
     tkplace(BiplotRegion.frame, relx = 0.005, rely = 0.04, relwidth = 0.6, 
-        relheight = 0.905, "in" = GUI.TopLevel)
+        relheight = 0.905, `in` = GUI.TopLevel)
     BiplotRegion.HorizontalScale.func <- function() as.numeric(tkwinfo("width", 
         BiplotRegion.frame))/as.numeric(tkwinfo("fpixels", BiplotRegion.frame, 
         "1i"))/4
@@ -6357,12 +6452,71 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
             xlab = "", ylab = "", bty = "n")
     }, hscale = BiplotRegion.HorizontalScale.func(), vscale = BiplotRegion.VerticalScale.func())
-    tkplace(BiplotRegion.image, "in" = BiplotRegion.frame, relwidth = 1, 
+    tkplace(BiplotRegion.image, `in` = BiplotRegion.frame, relwidth = 1, 
         relheight = 1)
     GUI.WindowWidth <- as.numeric(tkwinfo("width", GUI.TopLevel))
     GUI.WindowHeight <- as.numeric(tkwinfo("height", GUI.TopLevel))
     BiplotRegion.LegendFraction <- NULL
     Biplot.par <- NULL
+    Biplot.title <- NULL
+    Biplot.title.default <- NULL
+    Biplot.determine <- NULL
+    Biplot.layout <- NULL
+    Biplot.plot <- function() NULL
+    Biplot.replot <- function() tkrreplot(BiplotRegion.image, 
+        fun = Biplot.plot, hscale = BiplotRegion.HorizontalScale.func(), 
+        vscale = BiplotRegion.VerticalScale.func())
+    Biplot.predictions <- NULL
+    Biplot.interpolate <- NULL
+    Biplot.motion <- NULL
+    Biplot.OverAxis <- NULL
+    Biplot.LeftClick <- NULL
+    Biplot.LeftRelease <- NULL
+    Biplot.DoubleLeftClick <- NULL
+    Biplot.RightClick <- NULL
+    Biplot.plot3D <- NULL
+    Biplot.Xtransformed <- NULL
+    Biplot.Yfull <- NULL
+    Biplot.Yfull_ <- NULL
+    Biplot.Y <- NULL
+    Biplot.Y_ <- NULL
+    Biplot.Y3D <- NULL
+    Y3D <- NULL
+    Biplot.Y3D_ <- NULL
+    Biplot.Yinitial <- NULL
+    Biplot.Bfull_ <- NULL
+    Biplot.B <- NULL
+    Biplot.B_ <- NULL
+    Biplot.B3D <- NULL
+    Biplot.B3D_ <- NULL
+    Biplot.Binterpolate_ <- NULL
+    Biplot.Binterpolate <- NULL
+    Biplot.Bclassify <- NULL
+    Biplot.axis <- NULL
+    Biplot.axis3D <- NULL
+    Biplot.AxisInterpolate <- NULL
+    Biplot.O <- NULL
+    Biplot.O3D <- NULL
+    Biplot.variable <- NULL
+    Biplot.points.mode <- tclVar("0")
+    Biplot.xy <- c(0, 0)
+    Biplot.XY.move <- c(0, 0)
+    Biplot.XY.LeftClick <- c(0, 0)
+    Biplot.XY.RightClick <- c(0, 0)
+    Biplot.points.WhereHighlight <- NULL
+    Biplot.points.WhichHighlight <- NULL
+    Biplot.points.WhereClosestOnAxis <- NULL
+    Biplot.points.WhichClosestOnAxis <- NULL
+    Biplot.axes.var <- NULL
+    Biplot.axes.mode <- 0
+    Biplot.axes.WhichHighlight <- 0
+    Biplot.WasInside <- FALSE
+    Biplot.moved <- NULL
+    Biplot.moving.status <- NULL
+    Biplot.moving.which <- NULL
+    Biplot.zoom.mode <- 0
+    Biplot.xlimtouse <- NULL
+    Biplot.ylimtouse <- NULL
     Biplot.ConvertCoordinates <- function(xin, yin) {
         width <- as.numeric(tclvalue(tkwinfo("width", BiplotRegion.image)))
         height <- as.numeric(tclvalue(tkwinfo("height", BiplotRegion.image)))
@@ -6384,565 +6538,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 plotregionstartyprop) * (Biplot.par$usr[4] - 
                 Biplot.par$usr[3]) + Biplot.par$usr[3])
     }
-    Biplot.title <- NULL
-    Biplot.title.default <- NULL
-    Biplot.determine <- NULL
-    Biplot.layout <- NULL
-    Biplot.plot <- function() {
-        NULL
-    }
-    Biplot.replot <- function() tkrreplot(BiplotRegion.image, 
-        fun = Biplot.plot, hscale = BiplotRegion.HorizontalScale.func(), 
-        vscale = BiplotRegion.VerticalScale.func())
-    Biplot.predictions <- NULL
-    Biplot.interpolate <- NULL
-    Biplot.OverAxis <- NULL
-    Biplot.motion <- NULL
-    Biplot.LeftClick <- NULL
-    Biplot.LeftRelease <- NULL
-    Biplot.DoubleLeftClick <- NULL
-    Biplot.RightClick <- NULL
-    Biplot.plot3D <- NULL
-    Biplot.axes.var <- NULL
-    Biplot.WasInside <- FALSE
-    Biplot.legend.inside <- FALSE
-    Biplot.OverPoint <- function() {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-            Y <- Biplot.Y_
-        else Y <- Biplot.Y
-        min(PythagorasDistance(matrix(Biplot.XY.move, nrow = 1), 
-            Y)) < min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
-    }
-    Biplot.linear.OverAxis <- function() {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-            B <- Biplot.B_
-        else B <- Biplot.B
-        min(PythagorasDistance(matrix(Biplot.XY.move, nrow = 1), 
-            t(apply(B, 1, function(x) x %*% t(x) %*% Biplot.XY.move/sum(x^2))))) < 
-            min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
-    }
-    Biplot.general.motion <- function(x, y) {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
-            B <- Biplot.B_
-            Y <- Biplot.Y_
-        }
-        else {
-            B <- Biplot.B
-            Y <- Biplot.Y
-        }
-        Biplot.XY.move <<- Biplot.ConvertCoordinates(x, y)
-        if (Biplot.par$usr[1] <= Biplot.XY.move[1] && Biplot.XY.move[1] <= 
-            Biplot.par$usr[2] && Biplot.par$usr[3] <= Biplot.XY.move[2] && 
-            Biplot.XY.move[2] <= Biplot.par$usr[4]) {
-            Biplot.WasInside <<- TRUE
-            if (tclvalue(Biplot.points.mode) %in% c("1", "2")) {
-                tkconfigure(GUI.TopLevel, cursor = "tcross")
-                if (tclvalue(Biplot.points.mode) == "1") 
-                  Biplot.points.WhereHighlight <<- Biplot.XY.move
-                else {
-                  Biplot.points.WhichHighlight <<- which.min(PythagorasDistance(matrix(Biplot.XY.move, 
-                    nrow = 1), Y))
-                  Biplot.points.WhereHighlight <<- Y[Biplot.points.WhichHighlight, 
-                    ]
-                }
-                Biplot.predictions()
-                PredictionsTab.update()
-                Biplot.replot()
-            }
-            if (tclvalue(Biplot.points.mode) == "0" && (Biplot.OverPoint() || 
-                tclvalue(ControlButtons.HideAxes.var) == "0" && 
-                  Biplot.OverAxis() || Kraal.moving.status)) 
-                tkconfigure(GUI.TopLevel, cursor = "hand2")
-            else if (tclvalue(Biplot.points.mode) %in% c("1", 
-                "2")) 
-                tkconfigure(GUI.TopLevel, cursor = "tcross")
-            else tkconfigure(GUI.TopLevel, cursor = "arrow")
-        }
-        else {
-            if (Kraal.moving.status) 
-                tkconfigure(GUI.TopLevel, cursor = "hand2")
-            if (Biplot.WasInside) {
-                tkconfigure(GUI.TopLevel, cursor = "arrow")
-                if (tclvalue(Biplot.points.mode) %in% c("1", 
-                  "2")) 
-                  Biplot.replot()
-                Biplot.WasInside <<- FALSE
-            }
-        }
-    }
-    Biplot.general.LeftRelease <- function(x, y) {
-        temp.XY <- Biplot.ConvertCoordinates(x, y)
-        if (Kraal.moving.status && (temp.XY[1] < Biplot.par$usr[1] || 
-            temp.XY[1] > Biplot.par$usr[2] || temp.XY[2] < Biplot.par$usr[3] || 
-            temp.XY[2] > Biplot.par$usr[4])) 
-            switch(Kraal.moving.type, point = {
-                GUI.BindingsOff()
-                Biplot.SendPointToKraal.cmd()
-                GUI.BindingsOn()
-            }, axis = {
-                GUI.BindingsOff()
-                Biplot.SendAxisToKraal.cmd()
-                GUI.BindingsOn()
-            })
-        Kraal.moving.status <<- FALSE
-        tkconfigure(GUI.TopLevel, cursor = "arrow")
-    }
-    Biplot.general.DoubleLeftClick <- NULL
-    Legend.par <- NULL
-    Legend.ConvertCoordinates <- NULL
-    Legend.coordinates <- NULL
-    Legend.fraction <- NULL
-    Legend.CurrentPage <- 1
-    Legend.CurrentIndices <- NULL
-    Legend.LastPage <- NULL
-    Legend.legend <- NULL
-    Legend.text.col <- NULL
-    Legend.lty <- NULL
-    Legend.lwd <- NULL
-    Legend.lines.col <- NULL
-    Legend.pch <- NULL
-    Legend.pt.cex <- NULL
-    Legend.points.col <- NULL
-    Legend.pt.bg <- NULL
-    Legend.yes <- function() tclvalue(View.ShowGroupLabelsInLegend.var) == 
-        "1" || tclvalue(View.AxisLabels.var) == "2" || tclvalue(View.ShowAdditionalLabelsInLegend.var) == 
-        "1" && (tclvalue(Additional.Interpolate.ANewSample.var) == 
-        "1" && !bpar$ANewSample.LabelsInBiplot || tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
-        "1" && !bpar$SampleGroupMeans.LabelsInBiplot || tclvalue(Additional.ConvexHull.var) == 
-        "1" || tclvalue(Additional.AlphaBag.var) == "1" || tclvalue(Additional.ClassificationRegion.var) == 
-        "1")
-    Legend.func <- function() {
-        Legend.legend <<- NULL
-        Legend.text.col <<- NULL
-        Legend.lty <<- NULL
-        Legend.lwd <<- NULL
-        Legend.lines.col <<- NULL
-        Legend.pch <<- NULL
-        Legend.pt.cex <<- NULL
-        Legend.points.col <<- NULL
-        Legend.pt.bg <<- NULL
-        if (tclvalue(View.ShowGroupLabelsInLegend.var) == "1") {
-            Legend.legend <<- bpar$groups.label.text[groups.in]
-            Legend.text.col <<- rep("black", g.in)
-            Legend.lty <<- rep(1, g.in)
-            Legend.lwd <<- rep(1, g.in)
-            Legend.lines.col <<- rep(NA, g.in)
-            Legend.pch <<- bpar$gpoints.pch[groups.in]
-            Legend.pt.cex <<- bpar$gpoints.cex[groups.in]
-            Legend.points.col <<- bpar$gpoints.col.fg[groups.in]
-            Legend.pt.bg <<- bpar$gpoints.col.bg[groups.in]
-        }
-        if (tclvalue(View.AxisLabels.var) == "2") {
-            Legend.legend <<- c(Legend.legend, bpar$axes.label.text[variables.in])
-            Legend.text.col <<- c(Legend.text.col, rep("black", 
-                p.in))
-            Legend.lty <<- c(Legend.lty, bpar$axes.lty[variables.in])
-            Legend.lwd <<- c(Legend.lwd, bpar$axes.lwd[variables.in])
-            if (Biplot.axes.mode == 0) 
-                Legend.lines.col <<- c(Legend.lines.col, bpar$axes.col[variables.in])
-            else {
-                temp1 <- rep(bpar$interaction.highlight.axes.col.bg, 
-                  p.in)
-                temp1[variables.in == Biplot.axes.WhichHighlight] <- bpar$interaction.highlight.axes.col.fg
-                Legend.lines.col <<- c(Legend.lines.col, temp1)
-            }
-            Legend.pch <<- c(Legend.pch, rep(NA, p.in))
-            Legend.pt.cex <<- c(Legend.pt.cex, rep(NA, p.in))
-            Legend.points.col <<- c(Legend.points.col, rep(NA, 
-                p.in))
-            Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, p.in))
-        }
-        if (tclvalue(View.ShowAdditionalLabelsInLegend.var) == 
-            "1") {
-            if (tclvalue(Additional.Interpolate.ANewSample.var) == 
-                "1" && !bpar$ANewSample.LabelsInBiplot) {
-                Legend.legend <<- c(Legend.legend, bpar$ANewSample.label.text)
-                Legend.text.col <<- c(Legend.text.col, "black")
-                Legend.lty <<- c(Legend.lty, 1)
-                Legend.lwd <<- c(Legend.lwd, 1)
-                Legend.lines.col <<- c(Legend.lines.col, NA)
-                Legend.pch <<- c(Legend.pch, bpar$ANewSample.pch)
-                Legend.pt.cex <<- c(Legend.pt.cex, bpar$ANewSample.cex)
-                Legend.points.col <<- c(Legend.points.col, bpar$ANewSample.col.fg)
-                Legend.pt.bg <<- c(Legend.pt.bg, bpar$ANewSample.col.bg)
-            }
-            if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
-                "1" && !bpar$SampleGroupMeans.LabelsInBiplot) {
-                switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-                  "-1" = {
-                    Legend.legend <<- c(Legend.legend, "SGM: All samples")
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, 1)
-                    Legend.lwd <<- c(Legend.lwd, 1)
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      NA)
-                    Legend.pch <<- c(Legend.pch, 22)
-                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
-                    Legend.points.col <<- c(Legend.points.col, 
-                      "black")
-                    Legend.pt.bg <<- c(Legend.pt.bg, "black")
-                  }, "0" = {
-                    Legend.legend <<- c(Legend.legend, paste("SGM:", 
-                      bpar$groups.label.text[groups.in]))
-                    Legend.text.col <<- c(Legend.text.col, rep("black", 
-                      g.in))
-                    Legend.lty <<- c(Legend.lty, rep(1, g.in))
-                    Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      rep(NA, g.in))
-                    Legend.pch <<- c(Legend.pch, bpar$gSampleGroupMeans.pch[groups.in])
-                    Legend.pt.cex <<- c(Legend.pt.cex, bpar$gSampleGroupMeans.cex[groups.in])
-                    Legend.points.col <<- c(Legend.points.col, 
-                      bpar$gSampleGroupMeans.col.fg[groups.in])
-                    Legend.pt.bg <<- c(Legend.pt.bg, bpar$gSampleGroupMeans.col.bg[groups.in])
-                  }, {
-                    Legend.legend <<- c(Legend.legend, paste("SGM:", 
-                      bpar$groups.label.text[Additional.Interpolate.SampleGroupMeans.for]))
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, 1)
-                    Legend.lwd <<- c(Legend.lwd, 1)
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      NA)
-                    Legend.pch <<- c(Legend.pch, bpar$gSampleGroupMeans.pch[Additional.Interpolate.SampleGroupMeans.for])
-                    Legend.pt.cex <<- c(Legend.pt.cex, bpar$gSampleGroupMeans.cex[Additional.Interpolate.SampleGroupMeans.for])
-                    Legend.points.col <<- c(Legend.points.col, 
-                      bpar$gSampleGroupMeans.col.fg[Additional.Interpolate.SampleGroupMeans.for])
-                    Legend.pt.bg <<- c(Legend.pt.bg, bpar$gSampleGroupMeans.col.bg[Additional.Interpolate.SampleGroupMeans.for])
-                  })
-            }
-            if (tclvalue(Additional.ConvexHull.var) == "1" || 
-                tclvalue(Additional.AlphaBag.var) == "1") {
-                switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                  "-1" = {
-                    if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, "CH: All points")
-                    else Legend.legend <<- c(Legend.legend, "AB: All points")
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, if (g == 1) bpar$gConvexHullAlphaBag.lty else 1)
-                    Legend.lwd <<- c(Legend.lwd, if (g == 1) bpar$gConvexHullAlphaBag.lwd else 4)
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      if (g == 1) bpar$gConvexHullAlphaBag.col.fg else hcl(0, 
-                        0, 60))
-                    Legend.pch <<- c(Legend.pch, NA)
-                    Legend.pt.cex <<- c(Legend.pt.cex, NA)
-                    Legend.points.col <<- c(Legend.points.col, 
-                      NA)
-                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
-                  }, "0" = {
-                    if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, paste("CH:", 
-                        bpar$groups.label.text[groups.in]))
-                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
-                      bpar$groups.label.text[groups.in]))
-                    Legend.text.col <<- c(Legend.text.col, rep("black", 
-                      g.in))
-                    Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[groups.in])
-                    Legend.lwd <<- c(Legend.lwd, bpar$gConvexHullAlphaBag.lwd[groups.in])
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      bpar$gConvexHullAlphaBag.col.fg[groups.in])
-                    Legend.pch <<- c(Legend.pch, rep(NA, g.in))
-                    Legend.pt.cex <<- c(Legend.pt.cex, rep(NA, 
-                      g.in))
-                    Legend.points.col <<- c(Legend.points.col, 
-                      rep(NA, g.in))
-                    Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, 
-                      g.in))
-                  }, {
-                    if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, paste("CH:", 
-                        bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
-                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
-                      bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[Additional.ConvexHullAlphaBag.for])
-                    Legend.lwd <<- c(Legend.lwd, bpar$gConvexHullAlphaBag.lwd[Additional.ConvexHullAlphaBag.for])
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for])
-                    Legend.pch <<- c(Legend.pch, NA)
-                    Legend.pt.cex <<- c(Legend.pt.cex, NA)
-                    Legend.points.col <<- c(Legend.points.col, 
-                      NA)
-                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
-                  })
-            }
-            if (tclvalue(Additional.AlphaBag.var) == "1" && Additional.ConvexHullAlphaBag.ShowTukeyMedian && 
-                !bpar$ConvexHullAlphaBag.TukeyMedian.LabelsInBiplot) {
-                switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                  "-1" = {
-                    Legend.legend <<- c(Legend.legend, "TM: All points")
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, 1)
-                    Legend.lwd <<- c(Legend.lwd, 1)
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      NA)
-                    Legend.pch <<- c(Legend.pch, 0)
-                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
-                    Legend.points.col <<- c(Legend.points.col, 
-                      if (g == 1) bpar$gConvexHullAlphaBag.col.fg else hcl(0, 
-                        0, 60))
-                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
-                  }, "0" = {
-                    Legend.legend <<- c(Legend.legend, paste("TM:", 
-                      bpar$groups.label.text[groups.in]))
-                    Legend.text.col <<- c(Legend.text.col, rep("black", 
-                      g.in))
-                    Legend.lty <<- c(Legend.lty, rep(1, g.in))
-                    Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      rep(NA, g.in))
-                    Legend.pch <<- c(Legend.pch, rep(0, g.in))
-                    Legend.pt.cex <<- c(Legend.pt.cex, rep(2, 
-                      g.in))
-                    Legend.points.col <<- c(Legend.points.col, 
-                      bpar$gConvexHullAlphaBag.col.fg[groups.in])
-                    Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, 
-                      g.in))
-                  }, {
-                    Legend.legend <<- c(Legend.legend, paste("TM:", 
-                      bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
-                    Legend.text.col <<- c(Legend.text.col, "black")
-                    Legend.lty <<- c(Legend.lty, 1)
-                    Legend.lwd <<- c(Legend.lwd, 1)
-                    Legend.lines.col <<- c(Legend.lines.col, 
-                      NA)
-                    Legend.pch <<- c(Legend.pch, 0)
-                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
-                    Legend.points.col <<- c(Legend.points.col, 
-                      bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for])
-                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
-                  })
-            }
-            if (tclvalue(Additional.ClassificationRegion.var) == 
-                "1") {
-                Legend.legend <<- c(Legend.legend, paste("CR:", 
-                  bpar$groups.label.text[groups.in]))
-                Legend.text.col <<- c(Legend.text.col, rep("black", 
-                  g.in))
-                Legend.lty <<- c(Legend.lty, rep(1, g.in))
-                Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
-                Legend.lines.col <<- c(Legend.lines.col, rep(NA, 
-                  g.in))
-                Legend.pch <<- c(Legend.pch, rep(22, g.in))
-                Legend.pt.cex <<- c(Legend.pt.cex, rep(2, g.in))
-                Legend.points.col <<- c(Legend.points.col, bpar$gClassificationRegion.col.bg[groups.in])
-                Legend.pt.bg <<- c(Legend.pt.bg, bpar$gClassificationRegion.col.bg[groups.in])
-            }
-        }
-        Legend.legend <<- substr(Legend.legend, start = 1, stop = 14)
-        Legend.LastPage <<- (length(Legend.legend) - 1)%/%16 + 
-            1
-        if (Legend.CurrentPage > Legend.LastPage) 
-            Legend.CurrentPage <<- Legend.LastPage
-        if (Legend.CurrentPage < Legend.LastPage) {
-            tkentryconfigure(MenuBar.View, 16, state = "normal")
-            tkentryconfigure(Biplot.RightClickOutside.Menu, 11, 
-                state = "normal")
-            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
-                6, state = "normal")
-        }
-        else {
-            tkentryconfigure(MenuBar.View, 16, state = "disabled")
-            tkentryconfigure(Biplot.RightClickOutside.Menu, 11, 
-                state = "disabled")
-            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
-                6, state = "disabled")
-        }
-        if (Legend.CurrentPage > 1) {
-            tkentryconfigure(MenuBar.View, 17, state = "normal")
-            tkentryconfigure(Biplot.RightClickOutside.Menu, 12, 
-                state = "normal")
-            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
-                7, state = "normal")
-        }
-        else {
-            tkentryconfigure(MenuBar.View, 17, state = "disabled")
-            tkentryconfigure(Biplot.RightClickOutside.Menu, 12, 
-                state = "disabled")
-            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
-                7, state = "disabled")
-        }
-        Legend.CurrentIndices <<- ((Legend.CurrentPage - 1) * 
-            16 + 1):(min(Legend.CurrentPage * 16, length(Legend.legend)))
-        legend2(x = "center", legend = Legend.transpose(Legend.legend[Legend.CurrentIndices]), 
-            cex = 0.85, text.width = strwidth("12345678901234", 
-                cex = 0.85), text.col = Legend.transpose(Legend.text.col[Legend.CurrentIndices]), 
-            ncol = 4, lty = Legend.transpose(Legend.lty[Legend.CurrentIndices]), 
-            lwd = Legend.transpose(Legend.lwd[Legend.CurrentIndices]), 
-            lines.col = Legend.transpose(Legend.lines.col[Legend.CurrentIndices]), 
-            pch = Legend.transpose(Legend.pch[Legend.CurrentIndices]), 
-            pt.cex = Legend.transpose(Legend.pt.cex[Legend.CurrentIndices]), 
-            col = Legend.transpose(Legend.points.col[Legend.CurrentIndices]), 
-            pt.bg = Legend.transpose(Legend.pt.bg[Legend.CurrentIndices]))
-    }
-    Legend.transpose <- function(temp1) {
-        temp2 <- c(temp1)
-        temp3 <- matrix(nrow = 4, ncol = 4)
-        temp3[1:length(temp2)] <- temp2
-        c(t(temp3))
-    }
-    Legend.NextPage.cmd <- function() {
-        if (Legend.CurrentPage < Legend.LastPage) {
-            Legend.CurrentPage <<- Legend.CurrentPage + 1
-            Biplot.replot()
-        }
-    }
-    Legend.PrevPage.cmd <- function() {
-        if (Legend.CurrentPage > 1) {
-            Legend.CurrentPage <<- Legend.CurrentPage - 1
-            Biplot.replot()
-        }
-    }
-    Biplot.plot.SampleGroupMeans <- function() {
-        switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-            "-1" = {
-                if (g == 1) {
-                  temp1 <- bpar$gSampleGroupMeans.pch
-                  temp2 <- bpar$gSampleGroupMeans.cex
-                  temp3 <- bpar$gSampleGroupMeans.col.fg
-                  temp4 <- bpar$gSampleGroupMeans.col.bg
-                  temp5 <- bpar$gSampleGroupMeans.label.font
-                  temp6 <- bpar$gSampleGroupMeans.label.cex
-                  temp7 <- bpar$gSampleGroupMeans.label.col
-                  temp8 <- bpar$gSampleGroupMeans.label.HorizOffset
-                  temp9 <- bpar$gSampleGroupMeans.label.VertOffset
-                }
-                else {
-                  temp1 <- 22
-                  temp2 <- 2
-                  temp3 <- "black"
-                  temp4 <- "black"
-                  temp5 <- 2
-                  temp6 <- 1
-                  temp7 <- "black"
-                  temp8 <- 0
-                  temp9 <- -1
-                }
-            }, "0" = {
-                temp1 <- bpar$gSampleGroupMeans.pch[groups.in]
-                temp2 <- bpar$gSampleGroupMeans.cex[groups.in]
-                temp3 <- bpar$gSampleGroupMeans.col.fg[groups.in]
-                temp4 <- bpar$gSampleGroupMeans.col.bg[groups.in]
-                temp5 <- bpar$gSampleGroupMeans.label.font[groups.in]
-                temp6 <- bpar$gSampleGroupMeans.label.cex[groups.in]
-                temp7 <- bpar$gSampleGroupMeans.label.col[groups.in]
-                temp8 <- bpar$gSampleGroupMeans.label.HorizOffset[groups.in]
-                temp9 <- bpar$gSampleGroupMeans.label.VertOffset[groups.in]
-            }, {
-                temp1 <- bpar$gSampleGroupMeans.pch[Additional.Interpolate.SampleGroupMeans.for]
-                temp2 <- bpar$gSampleGroupMeans.cex[Additional.Interpolate.SampleGroupMeans.for]
-                temp3 <- bpar$gSampleGroupMeans.col.fg[Additional.Interpolate.SampleGroupMeans.for]
-                temp4 <- bpar$gSampleGroupMeans.col.bg[Additional.Interpolate.SampleGroupMeans.for]
-                temp5 <- bpar$gSampleGroupMeans.label.font[Additional.Interpolate.SampleGroupMeans.for]
-                temp6 <- bpar$gSampleGroupMeans.label.cex[Additional.Interpolate.SampleGroupMeans.for]
-                temp7 <- bpar$gSampleGroupMeans.label.col[Additional.Interpolate.SampleGroupMeans.for]
-                temp8 <- bpar$gSampleGroupMeans.label.HorizOffset[Additional.Interpolate.SampleGroupMeans.for]
-                temp9 <- bpar$gSampleGroupMeans.label.VertOffset[Additional.Interpolate.SampleGroupMeans.for]
-            })
-        if (bpar$SampleGroupMeans.LabelsInBiplot) {
-            text(Additional.Interpolate.SampleGroupMeans.coordinates[, 
-                1] + temp8 * strwidth("x", cex = temp6), Additional.Interpolate.SampleGroupMeans.coordinates[, 
-                2] + temp9 * strheight("x", cex = temp6), labels = Additional.Interpolate.SampleGroupMeans.label.text, 
-                font = temp5, cex = temp6, col = temp7)
-        }
-        points(Additional.Interpolate.SampleGroupMeans.coordinates[, 
-            1], Additional.Interpolate.SampleGroupMeans.coordinates[, 
-            2], pch = temp1, cex = temp2, col = temp3, bg = temp4)
-    }
-    Biplot.plot.ConvexHullAlphaBag.bg <- function() {
-        if (Additional.ConvexHullAlphaBag.for == -1) {
-            if (g == 1) 
-                temp1 <- bpar$gConvexHullAlphaBag.col.bg
-            else temp1 <- hcl(0, 0, 90)
-        }
-        else temp1 <- bpar$gConvexHullAlphaBag.col.bg[Additional.ConvexHullAlphaBag.for]
-        polygon(Additional.ConvexHullAlphaBag.coordinates[[1]], 
-            col = temp1, border = NA)
-    }
-    Biplot.plot.ConvexHullAlphaBag.fg <- function() {
-        switch(as.character(Additional.ConvexHullAlphaBag.for), 
-            "-1" = {
-                if (g == 1) {
-                  temp1 <- bpar$gConvexHullAlphaBag.lty
-                  temp2 <- bpar$gConvexHullAlphaBag.lwd
-                  temp3 <- bpar$gConvexHullAlphaBag.col.fg
-                }
-                else {
-                  temp1 <- 1
-                  temp2 <- 4
-                  temp3 <- hcl(0, 0, 60)
-                }
-            }, "0" = {
-                temp1 <- bpar$gConvexHullAlphaBag.lty[groups.in]
-                temp2 <- bpar$gConvexHullAlphaBag.lwd[groups.in]
-                temp3 <- bpar$gConvexHullAlphaBag.col.fg[groups.in]
-            }, {
-                temp1 <- bpar$gConvexHullAlphaBag.lty[Additional.ConvexHullAlphaBag.for]
-                temp2 <- bpar$gConvexHullAlphaBag.lwd[Additional.ConvexHullAlphaBag.for]
-                temp3 <- bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for]
-            })
-        sapply(1:length(temp1), function(x) lines(Additional.ConvexHullAlphaBag.coordinates[[x]], 
-            lty = temp1[x], lwd = temp2[x], col = temp3[x]))
-        if (tclvalue(Additional.AlphaBag.var) == "1" && Additional.ConvexHullAlphaBag.ShowTukeyMedian) {
-            switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                "-1" = {
-                  if (g == 1) {
-                    temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch
-                    temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex
-                    temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg
-                    temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg
-                    temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font
-                    temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex
-                    temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col
-                    temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset
-                    temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset
-                  }
-                  else {
-                    temp4 <- 0
-                    temp5 <- 2
-                    temp6 <- hcl(0, 0, 60)
-                    temp7 <- NA
-                    temp8 <- 3
-                    temp9 <- 1
-                    temp10 <- hcl(0, 0, 60)
-                    temp11 <- 0
-                    temp12 <- -1
-                  }
-                }, "0" = {
-                  temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch[groups.in]
-                  temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex[groups.in]
-                  temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg[groups.in]
-                  temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg[groups.in]
-                  temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font[groups.in]
-                  temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex[groups.in]
-                  temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col[groups.in]
-                  temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset[groups.in]
-                  temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset[groups.in]
-                }, {
-                  temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch[Additional.ConvexHullAlphaBag.for]
-                  temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex[Additional.ConvexHullAlphaBag.for]
-                  temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg[Additional.ConvexHullAlphaBag.for]
-                  temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg[Additional.ConvexHullAlphaBag.for]
-                  temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font[Additional.ConvexHullAlphaBag.for]
-                  temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex[Additional.ConvexHullAlphaBag.for]
-                  temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col[Additional.ConvexHullAlphaBag.for]
-                  temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset[Additional.ConvexHullAlphaBag.for]
-                  temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset[Additional.ConvexHullAlphaBag.for]
-                })
-            if (bpar$ConvexHullAlphaBag.TukeyMedian.LabelsInBiplot) 
-                text(Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
-                  1] + temp11 * strwidth("x", cex = temp9), Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
-                  2] + temp12 * strheight("x", cex = temp9), 
-                  labels = Additional.ConvexHullAlphaBag.TukeyMedian.label.text, 
-                  font = temp8, cex = temp9, col = temp10)
-            points(Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
-                1], Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
-                2], pch = temp4, cex = temp5, col = temp6, bg = temp7)
-        }
-    }
-    Biplot.linear.plot <- function(screen = TRUE) {
+    Biplot.linear.plot.interior <- function(screen = TRUE) {
         DrawLinearBiplotAxisOnly <- function(from = c(0, 0), 
             to, axis.lty, axis.lwd, axis.col, axis.label, axis.label.cex, 
             axis.label.las, axis.label.col, axis.label.font) {
@@ -7013,12 +6609,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 axis.label.cex = bpar$axes.label.cex[variables.in[i]], 
                 axis.label.las = bpar$axes.label.las[variables.in[i]], 
                 axis.label.col = temp4, axis.label.font = bpar$axes.label.font[variables.in[i]])
-            mu <- SettingsBox.transformation.func(IN = pretty(Data[samples.in, 
-                variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]), 
-                WhichCol = i)
-            PrettyMarkers <- zapsmall(pretty(Data[samples.in, 
-                variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]))
-            ttemp <- max(max(nchar(as.character(abs(PrettyMarkers) - 
+            mutemp <- Data[samples.in, variables.in[i]]
+            mu <- SettingsBox.transformation.func(IN = pretty(mutemp, 
+                n = bpar$axes.tick.n[variables.in[i]]), WhichCol = i)
+            PrettyMarkers <- zapsmall(pretty(mutemp, n = bpar$axes.tick.n[variables.in[i]]))
+            ttemp <- max(max(nchar(format(abs(PrettyMarkers) - 
                 trunc(abs(PrettyMarkers))))) - 2, 0)
             PrettyMarkersCharacter <- format(PrettyMarkers, nsmall = ttemp, 
                 trim = TRUE)
@@ -7138,7 +6733,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 .labels = temp.labels, labels.cex = temp.labels.cex, 
                 HorizOffset = temp.HorizOffset, VertOffset = temp.VertOffset))
         do.call("mynewplot", arglist)
-        if (tclvalue(View.ShowDisplaySpaceAxes.var) == "1") {
+        if (tclvalue(View.CalibrateDisplaySpaceAxes.var) == "1") {
             axis(side = 1, cex.axis = 0.75)
             axis(side = 2, cex.axis = 0.75)
         }
@@ -7162,12 +6757,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             sin(angle), -sin(angle), cos(angle)), ncol = 2)
         axes.tick.AbsLength <- bpar$axes.tick.RelLength * (par("usr")[2] - 
             par("usr")[1])
-        if (tclvalue(ControlButtons.HideAxes.var) == "0") 
+        if (tclvalue(Other.HideAxes.var) == "0") 
             if (Biplot.axes.mode == 0) {
                 for (i in 1:p.in) DrawLinearBiplotAxis(i)
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointLabels.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointLabels.var) == "1") 
                   text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                     strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                     Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7176,8 +6770,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bparp$points.label.font[samples.in], 
                     cex = bparp$points.label.cex[samples.in], 
                     col = bparp$points.label.col[samples.in])
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0") 
+                if (tclvalue(Other.HidePoints.var) == "0") 
                   points(Y, pch = bparp$points.pch[samples.in], 
                     cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                     bg = bparp$points.col.bg[samples.in])
@@ -7213,9 +6806,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   axis.label.las = bpar$axes.label.las[variables.in[i]], 
                   axis.label.col = bpar$interaction.highlight.axes.col.bg, 
                   axis.label.font = 1)
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointValues.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointValues.var) == "1") 
                   text(Y[, 1] + bpar$interaction.highlight.ShowValues.HorizOffset * 
                     strwidth("x", cex = bpar$interaction.highlight.ShowValues.cex), 
                     Y[, 2] + bpar$interaction.highlight.ShowValues.VertOffset * 
@@ -7226,9 +6818,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bpar$interaction.highlight.ShowValues.font, 
                     cex = bpar$interaction.highlight.ShowValues.cex, 
                     col = bpar$interaction.highlight.ShowValues.col)
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointLabels.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointLabels.var) == "1") 
                   text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                     strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                     Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7237,8 +6828,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bparp$points.label.font[samples.in], 
                     cex = bparp$points.label.cex[samples.in], 
                     col = bparp$points.label.col[samples.in])
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0") 
+                if (tclvalue(Other.HidePoints.var) == "0") 
                   points(Y, pch = bparp$points.pch[samples.in], 
                     cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                     bg = bparp$points.col.bg[samples.in])
@@ -7266,8 +6856,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 DrawLinearBiplotAxis(which(variables.in == Biplot.axes.WhichHighlight))
             }
         else {
-            if (tclvalue(ControlButtons.HidePoints.var) == "0" && 
-                tclvalue(View.ShowPointLabels.var) == "1") 
+            if (tclvalue(Other.HidePoints.var) == "0" && tclvalue(View.ShowPointLabels.var) == 
+                "1") 
                 text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                   strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                   Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7275,7 +6865,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   labels = bparp$points.label.text[samples.in], 
                   font = bparp$points.label.font[samples.in], 
                   cex = bparp$points.label.cex[samples.in], col = bparp$points.label.col[samples.in])
-            if (tclvalue(ControlButtons.HidePoints.var) == "0") 
+            if (tclvalue(Other.HidePoints.var) == "0") 
                 points(Y, pch = bparp$points.pch[samples.in], 
                   cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                   bg = bparp$points.col.bg[samples.in])
@@ -7327,191 +6917,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         box(which = "plot", lty = "solid")
     }
-    Biplot.linear.plot3D <- function() {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
-            Y3D <- Biplot.Y3D_
-            B3D <- Biplot.B3D_
-        }
-        else {
-            Y3D <- Biplot.Y3D
-            B3D <- Biplot.B3D
-        }
-        dimensions <- 1:3
-        if (!boptions$ReuseExternalWindows) 
-            rgl.open()
-        rgl.clear("all")
-        rgl.bg(sphere = TRUE, color = c("whitesmoke", "gray90"), 
-            lit = FALSE)
-        rgl.light()
-        if (tclvalue(ControlButtons.HidePoints.var) == "0") {
-            for (temp1 in groups.in) {
-                temp1b <- group[samples.in] == levels(group[samples.in])[temp1]
-                points3d(Y3D[temp1b, 1], Y3D[temp1b, 2], Y3D[temp1b, 
-                  3], col = bparp$points.col.bg[samples.in[temp1b]], 
-                  size = bparp$points.cex[samples.in[temp1b]][1] * 
-                    8, alpha = 0.5)
-            }
-            if (tclvalue(View.ShowPointLabels.var) == "1") 
-                text3d(Y3D[, 1], Y3D[, 2], Y3D[, 3], texts = bparp$points.label.text[samples.in], 
-                  col = bparp$points.label.col[samples.in], family = "sans", 
-                  font = bparp$points.label.font[samples.in], 
-                  cex = bparp$points.label.cex[samples.in])
-        }
-        if (tclvalue(ControlButtons.HideAxes.var) == "0") {
-            radiustemp <- 0
-            for (i in 1:p.in) {
-                PrettyMarkers <- zapsmall(pretty(Data[samples.in, 
-                  variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]))
-                ttemp <- max(max(nchar(as.character(abs(PrettyMarkers) - 
-                  trunc(abs(PrettyMarkers))))) - 2, 0)
-                PrettyMarkersCharacter <- format(PrettyMarkers, 
-                  nsmall = ttemp, trim = TRUE)
-                mu <- SettingsBox.transformation.func(IN = pretty(Data[samples.in, 
-                  variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]), 
-                  WhichCol = i)
-                WhichRemove <- which(abs(mu) == Inf)
-                if (length(WhichRemove) > 0) {
-                  PrettyMarkers <- PrettyMarkers[-WhichRemove]
-                  PrettyMarkersCharacter <- PrettyMarkersCharacter[-WhichRemove]
-                  mu <- mu[-WhichRemove]
-                }
-                Coord <- t(sapply(mu, function(a) B3D[i, ] * 
-                  a))
-                if (tclvalue(tkget(SettingsBox.action.combo)) == 
-                  "Predict") 
-                  Coord <- Coord/sum(B3D[i, ]^2)
-                else if (tclvalue(tkget(SettingsBox.action.combo)) == 
-                  "Interpolate: centroid") 
-                  Coord <- Coord * p.in
-                if ((temp0 <- max(apply(Coord, 1, function(x) sum(x^2)^0.5))) > 
-                  radiustemp) 
-                  radiustemp <- temp0
-                text3d(Coord, texts = PrettyMarkersCharacter, 
-                  col = bpar$axes.marker.col[variables.in[i]], 
-                  family = "sans", font = bpar$axes.marker.font[variables.in[i]], 
-                  cex = bpar$axes.marker.cex[variables.in[i]])
-            }
-            radius <- max(apply(Y3D, 1, function(x) sum(x^2)^0.5), 
-                radiustemp) * 1.1
-            axes <- sweep(B3D, 1, 1/apply(B3D, 1, function(x) sum(x^2)^0.5) * 
-                radius, "*")
-            temp2 <- matrix(0, nrow = 2 * p.in, ncol = 3)
-            temp2[seq(2, nrow(temp2), by = 2) - 1, ] <- -axes
-            temp2[seq(2, nrow(temp2), by = 2), ] <- axes
-            for (temp3 in 1:p.in) segments3d(temp2[(temp3 * 2 - 
-                1):(temp3 * 2), ], col = rep(bpar$axes.col[variables.in[temp3]], 
-                each = 2), size = bpar$axes.lwd[variables.in[temp3]])
-            if (tclvalue(View.AxisLabels.var) != "0") {
-                text3d(axes * 1.02, texts = paste(bpar$axes.label.text[variables.in], 
-                  "+", sep = ""), family = "sans", font = bpar$axes.label.font[variables.in], 
-                  cex = bpar$axes.label.cex[variables.in], col = bpar$axes.label.col[variables.in])
-                text3d(-axes * 1.02, texts = paste(bpar$axes.label.text[variables.in], 
-                  "-", sep = ""), family = "sans", font = bpar$axes.label.font[variables.in], 
-                  cex = bpar$axes.label.cex[variables.in], col = bpar$axes.label.col[variables.in])
-            }
-        }
-        aspect3d("iso")
-        lims <- par3d("bbox")
-        segments3d(matrix(c(lims[1], lims[3], lims[5], lims[2], 
-            lims[3], lims[5], lims[1], lims[3], lims[5], lims[1], 
-            lims[4], lims[5], lims[1], lims[3], lims[5], lims[1], 
-            lims[3], lims[6]), byrow = TRUE, ncol = 3), col = "gray60")
-        text3d(matrix(c((lims[1] + lims[2])/2, lims[3], lims[5], 
-            lims[1], (lims[3] + lims[4])/2, lims[5], lims[1], 
-            lims[3], (lims[5] + lims[6])/2), byrow = TRUE, nrow = 3), 
-            texts = paste("Dimension ", dimensions), col = "gray60", 
-            family = "sans", font = 1, cex = 1)
-        if (tclvalue(View.ShowTitle.var) == "1") 
-            title3d(Biplot.title, color = "black", family = "sans", 
-                font = 2, cex = 1)
-        par3d(mouseMode = boptions$ThreeD.MouseButtonAction)
-        light3d(theta = 0, phi = 15)
-        if (boptions$ThreeD.FlyBy) {
-            start <- proc.time()[3]
-            while (proc.time()[3] - start < 0.75) {
-            }
-            start <- proc.time()[3]
-            while ((i <- 36 * (proc.time()[3] - start)) < 360) rgl.viewpoint(i, 
-                15 - (i - 90)/4, zoom = (if (i < 180) 
-                  (i + 1)^-0.5
-                else (360 - i + 1)^-0.5))
-            rgl.viewpoint(zoom = 1)
-        }
-    }
-    Biplot.linear.predictions <- function() {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-            B <- Biplot.B_
-        else B <- Biplot.B
-        Biplot.points.WhereClosestOnAxis <<- t(apply(B, 1, function(x) x %*% 
-            t(x) %*% Biplot.points.WhereHighlight/sum(x^2)))
-        Biplot.points.WhichClosestOnAxis <<- SettingsBox.BackTransformation.func(Biplot.points.WhereClosestOnAxis[, 
-            1]/apply(B, 1, function(x) x[1]/sum(x^2)), ARow = TRUE)
-    }
-    Biplot.linear.interpolate <- function(ToInterpolate) {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-            Binterpolate <- Biplot.Binterpolate_
-        else Binterpolate <- Biplot.Binterpolate
-        temp1 <- SettingsBox.transformation.func(IN = c(ToInterpolate), 
-            ARow = TRUE)
-        temp2 <- sweep(Binterpolate, 1, temp1, "*")
-        colSums(temp2)
-    }
-    Biplot.general.LeftClick <- function(x, y) {
-        Biplot.XY.move <<- Biplot.XY.RightClick <<- Biplot.ConvertCoordinates(x, 
-            y)
-        if (Biplot.OverPoint()) {
-            Kraal.moving.type <<- "point"
-            Kraal.moving.status <<- TRUE
-        }
-        else if (Biplot.OverAxis()) {
-            Kraal.moving.type <<- "axis"
-            Kraal.moving.status <<- TRUE
-        }
-    }
-    Biplot.general.RightClick <- function(x, y) {
-        Biplot.xy <<- c(x, y)
-        Biplot.XY.RightClick <<- Biplot.ConvertCoordinates(x, 
-            y)
-        if (Biplot.par$usr[1] <= Biplot.XY.RightClick[1] && Biplot.XY.RightClick[1] <= 
-            Biplot.par$usr[2] && Biplot.par$usr[3] <= Biplot.XY.RightClick[2] && 
-            Biplot.XY.RightClick[2] <= Biplot.par$usr[4]) {
-            if (tclvalue(Biplot.points.mode) == "0" && Biplot.OverPoint()) 
-                tkpopup(Biplot.RightClickOnPoint.Menu, tclvalue(tkwinfo("pointerx", 
-                  BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
-                  BiplotRegion.image)))
-            else if (tclvalue(Biplot.points.mode) == "0" && tclvalue(ControlButtons.HideAxes.var) == 
-                "0" && Biplot.OverAxis()) 
-                tkpopup(Biplot.RightClickOnAxis.Menu, tclvalue(tkwinfo("pointerx", 
-                  BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
-                  BiplotRegion.image)))
-            else tkpopup(Biplot.RightClickInside.Menu, tclvalue(tkwinfo("pointerx", 
-                BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
-                BiplotRegion.image)))
-        }
-        else tkpopup(Biplot.RightClickOutside.Menu, tclvalue(tkwinfo("pointerx", 
-            BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
-            BiplotRegion.image)))
-    }
-    Biplot.NonLinear.OverAxis <- function() {
-        temp0 <- unlist(lapply(Biplot.axis, function(mat) {
-            temp1 <- nrow(mat)
-            temp2 <- sweep(-mat[-temp1, ], 2, Biplot.XY.move, 
-                "+")
-            temp3 <- diff(mat)
-            temp4 <- rowSums(temp3 * temp2)
-            temp5 <- rowSums(temp3^2)
-            temp6 <- ifelse(abs(temp5) < eps, 0, temp4/temp5)
-            temp6 <- sapply(temp6, function(x) min(max(0, x), 
-                1))
-            min(rowSums(temp2^2) - temp6^2 * temp5)
-        }))
-        sqrt(min(temp0)) < min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
+    Biplot.linear.plot <- function(screen = TRUE) {
+        Biplot.linear.plot.interior(screen)
     }
     Biplot.NonLinear.determine.interpolative <- function() {
         temp0 <- matrix(0, nrow = n.in, ncol = n.in)
         temp0[cbind(1:n.in, 1:n.in)] <- 1
         temp0 <- temp0 - 1/n.in
-        D <- -0.5 * Points.DistanceMetric.DissimilarityMatrix^2
+        D <- -0.5 * Points.DissimilarityMetric.DissimilarityMatrix^2
         B <- temp0 %*% D %*% temp0
         eigenB <- eigen(B, symmetric = TRUE)
         eigenB$vectors <- (apply(eigenB$vectors, 2, function(x) x * 
@@ -7530,7 +6943,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Biplot.Yfull <- V %*% diag(eigenB$values[1:rB]^0.5)
         Biplot.Y <<- Biplot.Yfull[, 1:2]
         Biplot.Y3D <<- Biplot.Yfull[, 1:3]
-        d <- function(x) -0.5 * (Points.DistanceMetric.func(x, 
+        d <- function(x) -0.5 * (Points.DissimilarityMetric.func(x, 
             Biplot.Xtransformed))^2
         if (substr(tclvalue(tkget(SettingsBox.transformation.combo)), 
             start = 1, stop = 3) == "Log") 
@@ -7556,7 +6969,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             markers <- zapsmall(seq(PrettyMarkers[1], PrettyMarkers[length(PrettyMarkers)], 
                 by = PrettyMarkersIncrement/boptions$axes.tick.inter.n[variables.in[i]]))
             PrettyMarkers <- PrettyMarkersTemp
-            ttemp <- max(max(nchar(as.character(abs(PrettyMarkers) - 
+            ttemp <- max(max(nchar(format(abs(PrettyMarkers) - 
                 trunc(abs(PrettyMarkers))))) - 2, 0)
             PrettyMarkersCharacter <- format(PrettyMarkers, nsmall = ttemp, 
                 trim = TRUE)
@@ -7754,7 +7167,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   VertOffset = c(temp.VertOffset, rep(0, nrowAllAxesMat))))
         }
         do.call("mynewplot", arglist)
-        if (tclvalue(View.ShowDisplaySpaceAxes.var) == "1") {
+        if (tclvalue(View.CalibrateDisplaySpaceAxes.var) == "1") {
             axis(side = 1, cex.axis = 0.75)
             axis(side = 2, cex.axis = 0.75)
         }
@@ -7775,7 +7188,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "0") 
             Biplot.plot.ConvexHullAlphaBag.bg()
         AxisInstruction <- Biplot.NonLinear.layout()
-        if (tclvalue(ControlButtons.HideAxes.var) == "0") 
+        if (tclvalue(Other.HideAxes.var) == "0") 
             if (Biplot.axes.mode == 0) {
                 for (i in 1:p.in) {
                   lines(Biplot.axis[[i]], lty = bpar$axes.col.lty[variables.in[i]], 
@@ -7794,9 +7207,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     cex = bpar$axes.marker.cex[variables.in[i]], 
                     col = bpar$axes.marker.col[variables.in[i]])
                 }
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointLabels.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointLabels.var) == "1") 
                   text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                     strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                     Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7805,8 +7217,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bparp$points.label.font[samples.in], 
                     cex = bparp$points.label.cex[samples.in], 
                     col = bparp$points.label.col[samples.in])
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0") 
+                if (tclvalue(Other.HidePoints.var) == "0") 
                   points(Y, pch = bparp$points.pch[samples.in], 
                     cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                     bg = bparp$points.col.bg[samples.in])
@@ -7836,9 +7247,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 for (i in which(variables.in != Biplot.axes.WhichHighlight)) lines(Biplot.axis[[i]], 
                   lty = bpar$axes.col.lty[variables.in[i]], lwd = bpar$axes.col.lwd[variables.in[i]], 
                   col = bpar$interaction.highlight.axes.col.bg)
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointValues.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointValues.var) == "1") 
                   text(Y[, 1] + bpar$interaction.highlight.ShowValues.HorizOffset * 
                     strwidth("x", cex = bpar$interaction.highlight.ShowValues.cex), 
                     Y[, 2] + bpar$interaction.highlight.ShowValues.VertOffset * 
@@ -7849,9 +7259,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bpar$interaction.highlight.ShowValues.font, 
                     cex = bpar$interaction.highlight.ShowValues.cex, 
                     col = bpar$interaction.highlight.ShowValues.col)
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0" && tclvalue(View.ShowPointLabels.var) == 
-                  "1") 
+                if (tclvalue(Other.HidePoints.var) == "0" && 
+                  tclvalue(View.ShowPointLabels.var) == "1") 
                   text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                     strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                     Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7860,8 +7269,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     font = bparp$points.label.font[samples.in], 
                     cex = bparp$points.label.cex[samples.in], 
                     col = bparp$points.label.col[samples.in])
-                if (tclvalue(ControlButtons.HidePoints.var) == 
-                  "0") 
+                if (tclvalue(Other.HidePoints.var) == "0") 
                   points(Y, pch = bparp$points.pch[samples.in], 
                     cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                     bg = bparp$points.col.bg[samples.in])
@@ -7903,8 +7311,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   col = bpar$interaction.highlight.axes.col.fg)
             }
         else {
-            if (tclvalue(ControlButtons.HidePoints.var) == "0" && 
-                tclvalue(View.ShowPointLabels.var) == "1") 
+            if (tclvalue(Other.HidePoints.var) == "0" && tclvalue(View.ShowPointLabels.var) == 
+                "1") 
                 text(Y[, 1] + bparp$points.label.HorizOffset[samples.in] * 
                   strwidth("x", cex = bparp$points.label.cex[samples.in]), 
                   Y[, 2] + bparp$points.label.VertOffset[samples.in] * 
@@ -7912,7 +7320,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   labels = bparp$points.label.text[samples.in], 
                   font = bparp$points.label.font[samples.in], 
                   cex = bparp$points.label.cex[samples.in], col = bparp$points.label.col[samples.in])
-            if (tclvalue(ControlButtons.HidePoints.var) == "0") 
+            if (tclvalue(Other.HidePoints.var) == "0") 
                 points(Y, pch = bparp$points.pch[samples.in], 
                   cex = bparp$points.cex[samples.in], col = bparp$points.col.fg[samples.in], 
                   bg = bparp$points.col.bg[samples.in])
@@ -7970,131 +7378,309 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         box(which = "plot", lty = "solid")
     }
+    Biplot.linear.predictions <- function() {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+            B <- Biplot.B_
+        else B <- Biplot.B
+        Biplot.points.WhereClosestOnAxis <<- t(apply(B, 1, function(x) x %*% 
+            t(x) %*% Biplot.points.WhereHighlight/sum(x^2)))
+        Biplot.points.WhichClosestOnAxis <<- SettingsBox.BackTransformation.func(Biplot.points.WhereClosestOnAxis[, 
+            1]/apply(B, 1, function(x) x[1]/sum(x^2)), ARow = TRUE)
+    }
+    Biplot.linear.interpolate <- function(ToInterpolate) {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+            Binterpolate <- Biplot.Binterpolate_
+        else Binterpolate <- Biplot.Binterpolate
+        temp1 <- SettingsBox.transformation.func(IN = c(ToInterpolate), 
+            ARow = TRUE)
+        temp2 <- sweep(Binterpolate, 1, temp1, "*")
+        colSums(temp2)
+    }
     Biplot.NonLinear.interpolate <- function(ToInterpolate) {
         if (is.null(Biplot.AxisInterpolate)) 
             Biplot.NonLinear.determine.interpolative()
         colSums(t(sapply(1:p.in, function(x) Biplot.AxisInterpolate[[x]][which.min(abs(ToInterpolate[x] - 
             Biplot.variable[[x]]$markers)), ])))
     }
-    Biplot.NonLinear.plot3D <- function() {
-        if (tclvalue(tkget(SettingsBox.action.combo)) == "Predict") {
-            Axes.CircularNonLinear.determine(rho = 3)
-            O3D <- Axes.CircularNonLinear.g
+    Biplot.general.motion <- function(x, y) {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
+            B <- Biplot.B_
+            Y <- Biplot.Y_
         }
-        else O3D <- Biplot.O3D
-        dimensions <- 1:3
-        if (!boptions$ReuseExternalWindows) 
-            rgl.open()
-        rgl.clear("all")
-        rgl.bg(sphere = TRUE, color = c("whitesmoke", "gray90"), 
-            lit = FALSE)
-        rgl.light()
-        if (tclvalue(ControlButtons.HidePoints.var) == "0") {
-            for (temp1 in groups.in) {
-                temp1b <- group[samples.in] == levels(group[samples.in])[temp1]
-                points3d(Y3D[temp1b, 1], Y3D[temp1b, 2], Y3D[temp1b, 
-                  3], col = bparp$points.col.bg[samples.in[temp1b]], 
-                  size = bparp$points.cex[samples.in[temp1b]][1] * 
-                    8, alpha = 0.5)
+        else {
+            B <- Biplot.B
+            Y <- Biplot.Y
+        }
+        Biplot.XY.move <<- Biplot.ConvertCoordinates(x, y)
+        if (Biplot.par$usr[1] <= Biplot.XY.move[1] && Biplot.XY.move[1] <= 
+            Biplot.par$usr[2] && Biplot.par$usr[3] <= Biplot.XY.move[2] && 
+            Biplot.XY.move[2] <= Biplot.par$usr[4]) {
+            Biplot.WasInside <<- TRUE
+            if (tclvalue(Biplot.points.mode) %in% c("1", "2")) {
+                tkconfigure(GUI.TopLevel, cursor = "tcross")
+                if (tclvalue(Biplot.points.mode) == "1") 
+                  Biplot.points.WhereHighlight <<- Biplot.XY.move
+                else {
+                  Biplot.points.WhichHighlight <<- which.min(PythagorasDistance(matrix(Biplot.XY.move, 
+                    nrow = 1), Y))
+                  Biplot.points.WhereHighlight <<- Y[Biplot.points.WhichHighlight, 
+                    ]
+                }
+                Biplot.predictions()
+                PredictionsTab.update()
+                Biplot.replot()
             }
-            if (tclvalue(View.ShowPointLabels.var) == "1") 
-                text3d(Y3D[, 1], Y3D[, 2], Y3D[, 3], texts = bparp$points.label.text[samples.in], 
-                  col = bparp$points.label.col[samples.in], family = "sans", 
-                  font = bparp$points.label.font[samples.in], 
-                  cex = bparp$points.label.cex[samples.in])
+            if (tclvalue(Biplot.points.mode) == "0" && (Biplot.OverPoint() || 
+                tclvalue(Other.HideAxes.var) == "0" && Biplot.OverAxis() || 
+                Kraal.moving.status)) 
+                tkconfigure(GUI.TopLevel, cursor = "hand2")
+            else if (tclvalue(Biplot.points.mode) %in% c("1", 
+                "2")) 
+                tkconfigure(GUI.TopLevel, cursor = "tcross")
+            else tkconfigure(GUI.TopLevel, cursor = "arrow")
         }
-        if (tclvalue(ControlButtons.HideAxes.var) == "0") 
-            for (i in 1:p.in) text3d(Biplot.axis3D[[i]][Biplot.variable[[i]]$PrettyMarkersIndex, 
-                ], texts = Biplot.variable[[i]]$PrettyMarkersCharacter, 
-                col = bpar$axes.marker.col[variables.in[i]], 
-                family = "sans", font = bpar$axes.marker.font[variables.in[i]], 
-                cex = bpar$axes.marker.cex[variables.in[i]])
-        if (tclvalue(ControlButtons.HideAxes.var) == "0") {
-            for (i in 1:p.in) lines3d(Biplot.axis3D[[i]], col = bpar$axes.col[variables.in[i]], 
-                size = bpar$axes.lwd[variables.in[i]])
-            if (tclvalue(View.AxisLabels.var) != "0") 
-                for (i in 1:p.in) text3d(Biplot.axis3D[[i]][c(1, 
-                  nrow(Biplot.axis3D[[i]])), ], texts = paste(bpar$axes.label.text[variables.in[i]], 
-                  c("-", "+"), sep = ""), col = bpar$axes.label.col[variables.in[i]], 
-                  family = "sans", font = bpar$axes.label.font[variables.in], 
-                  cex = bpar$axes.label.cex[variables.in])
-        }
-        furthest <- max(unlist(lapply(Biplot.axis3D, function(x) max(abs(sweep(x, 
-            2, O3D, "-"))))), abs(sweep(Biplot.Y3D, 2, O3D, "-")))
-        furthestmat <- matrix(c(O3D[1] + furthest, 0, 0, O3D[1] - 
-            furthest, 0, 0, 0, O3D[2] + furthest, 0, 0, O3D[2] - 
-            furthest, 0, 0, 0, O3D[3] + furthest, 0, 0, O3D[3] - 
-            furthest), ncol = 3, byrow = TRUE)
-        points3d(furthestmat[, 1], furthestmat[, 2], furthestmat[, 
-            3], col = "white")
-        aspect3d("iso")
-        lims <- par3d("bbox")
-        segments3d(matrix(c(lims[1], lims[3], lims[5], lims[2], 
-            lims[3], lims[5], lims[1], lims[3], lims[5], lims[1], 
-            lims[4], lims[5], lims[1], lims[3], lims[5], lims[1], 
-            lims[3], lims[6]), byrow = TRUE, ncol = 3), col = "gray60")
-        text3d(matrix(c((lims[1] + lims[2])/2, lims[3], lims[5], 
-            lims[1], (lims[3] + lims[4])/2, lims[5], lims[1], 
-            lims[3], (lims[5] + lims[6])/2), byrow = TRUE, nrow = 3), 
-            texts = paste("Dimension ", dimensions), col = "gray60", 
-            family = "sans", font = 1, cex = 1)
-        if (tclvalue(View.ShowTitle.var) == "1") 
-            title3d(Biplot.title, color = "black", family = "sans", 
-                font = 2, cex = 1)
-        par3d(mouseMode = boptions$ThreeD.MouseButtonAction)
-        light3d(theta = 0, phi = 15)
-        if (boptions$ThreeD.FlyBy) {
-            start <- proc.time()[3]
-            while (proc.time()[3] - start < 0.75) {
+        else {
+            if (Kraal.moving.status) 
+                tkconfigure(GUI.TopLevel, cursor = "hand2")
+            if (Biplot.WasInside) {
+                tkconfigure(GUI.TopLevel, cursor = "arrow")
+                if (tclvalue(Biplot.points.mode) %in% c("1", 
+                  "2")) 
+                  Biplot.replot()
+                Biplot.WasInside <<- FALSE
             }
-            start <- proc.time()[3]
-            while ((i <- 36 * (proc.time()[3] - start)) < 360) rgl.viewpoint(i, 
-                15 - (i - 90)/4, zoom = (if (i < 180) 
-                  (i + 1)^-0.5
-                else (360 - i + 1)^-0.5))
-            rgl.viewpoint(zoom = 1)
         }
     }
-    Biplot.points.mode <- tclVar("0")
-    Biplot.xy <- c(0, 0)
-    Biplot.XY.move <- c(0, 0)
-    Biplot.XY.LeftClick <- c(0, 0)
-    Biplot.XY.RightClick <- c(0, 0)
-    Biplot.points.WhereHighlight <- NULL
-    Biplot.points.WhichHighlight <- NULL
-    Biplot.points.WhereClosestOnAxis <- NULL
-    Biplot.points.WhichClosestOnAxis <- NULL
-    Biplot.axes.mode <- 0
-    Biplot.axes.WhichHighlight <- 0
-    Biplot.Xtransformed <- NULL
-    Biplot.Yfull <- NULL
-    Biplot.Yfull_ <- NULL
-    Biplot.Y <- NULL
-    Biplot.Y_ <- NULL
-    Biplot.Y3D <- NULL
-    Y3D <- NULL
-    Biplot.Y3D_ <- NULL
-    Biplot.Yinitial <- NULL
-    Biplot.Bfull_ <- NULL
-    Biplot.B <- NULL
-    Biplot.B_ <- NULL
-    Biplot.B3D <- NULL
-    Biplot.B3D_ <- NULL
-    Biplot.Binterpolate_ <- NULL
-    Biplot.Binterpolate <- NULL
-    Biplot.Bclassify <- NULL
-    Biplot.axis <- NULL
-    Biplot.axis3D <- NULL
-    Biplot.AxisInterpolate <- NULL
-    Biplot.O <- NULL
-    Biplot.O3D <- NULL
-    Biplot.variable <- NULL
-    Biplot.moved <- NULL
-    Biplot.moving.status <- NULL
-    Biplot.moving.which <- NULL
-    Biplot.zoom.mode <- 0
-    Biplot.xlimtouse <- NULL
-    Biplot.ylimtouse <- NULL
+    Biplot.OverPoint <- function() {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+            Y <- Biplot.Y_
+        else Y <- Biplot.Y
+        min(PythagorasDistance(matrix(Biplot.XY.move, nrow = 1), 
+            Y)) < min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
+    }
+    Biplot.linear.OverAxis <- function() {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+            B <- Biplot.B_
+        else B <- Biplot.B
+        min(PythagorasDistance(matrix(Biplot.XY.move, nrow = 1), 
+            t(apply(B, 1, function(x) x %*% t(x) %*% Biplot.XY.move/sum(x^2))))) < 
+            min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
+    }
+    Biplot.NonLinear.OverAxis <- function() {
+        temp0 <- unlist(lapply(Biplot.axis, function(mat) {
+            temp1 <- nrow(mat)
+            temp2 <- sweep(-mat[-temp1, ], 2, Biplot.XY.move, 
+                "+")
+            temp3 <- diff(mat)
+            temp4 <- rowSums(temp3 * temp2)
+            temp5 <- rowSums(temp3^2)
+            temp6 <- ifelse(abs(temp5) < eps, 0, temp4/temp5)
+            temp6 <- sapply(temp6, function(x) min(max(0, x), 
+                1))
+            min(rowSums(temp2^2) - temp6^2 * temp5)
+        }))
+        sqrt(min(temp0)) < min(Biplot.par$strwidthx, Biplot.par$strheightx)/1.75
+    }
+    Biplot.general.LeftClick <- function(x, y) {
+        Biplot.XY.move <<- Biplot.XY.RightClick <<- Biplot.ConvertCoordinates(x, 
+            y)
+        if (Biplot.OverPoint()) {
+            Kraal.moving.type <<- "point"
+            Kraal.moving.status <<- TRUE
+        }
+        else if (Biplot.OverAxis()) {
+            Kraal.moving.type <<- "axis"
+            Kraal.moving.status <<- TRUE
+        }
+    }
+    Biplot.general.LeftRelease <- function(x, y) {
+        temp.XY <- Biplot.ConvertCoordinates(x, y)
+        if (Kraal.moving.status && (temp.XY[1] < Biplot.par$usr[1] || 
+            temp.XY[1] > Biplot.par$usr[2] || temp.XY[2] < Biplot.par$usr[3] || 
+            temp.XY[2] > Biplot.par$usr[4])) 
+            switch(Kraal.moving.type, point = {
+                GUI.BindingsOff()
+                Biplot.SendPointToKraal.cmd()
+                GUI.BindingsOn()
+            }, axis = {
+                GUI.BindingsOff()
+                Biplot.SendAxisToKraal.cmd()
+                GUI.BindingsOn()
+            })
+        Kraal.moving.status <<- FALSE
+        tkconfigure(GUI.TopLevel, cursor = "arrow")
+    }
+    Biplot.general.DoubleLeftClick <- NULL
+    Biplot.general.RightClick <- function(x, y) {
+        Biplot.xy <<- c(x, y)
+        Biplot.XY.RightClick <<- Biplot.ConvertCoordinates(x, 
+            y)
+        if (Biplot.par$usr[1] <= Biplot.XY.RightClick[1] && Biplot.XY.RightClick[1] <= 
+            Biplot.par$usr[2] && Biplot.par$usr[3] <= Biplot.XY.RightClick[2] && 
+            Biplot.XY.RightClick[2] <= Biplot.par$usr[4]) {
+            if (tclvalue(Biplot.points.mode) == "0" && Biplot.OverPoint()) 
+                tkpopup(Biplot.RightClickOnPoint.Menu, tclvalue(tkwinfo("pointerx", 
+                  BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
+                  BiplotRegion.image)))
+            else if (tclvalue(Biplot.points.mode) == "0" && tclvalue(Other.HideAxes.var) == 
+                "0" && Biplot.OverAxis()) 
+                tkpopup(Biplot.RightClickOnAxis.Menu, tclvalue(tkwinfo("pointerx", 
+                  BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
+                  BiplotRegion.image)))
+            else tkpopup(Biplot.RightClickInside.Menu, tclvalue(tkwinfo("pointerx", 
+                BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
+                BiplotRegion.image)))
+        }
+        else tkpopup(Biplot.RightClickOutside.Menu, tclvalue(tkwinfo("pointerx", 
+            BiplotRegion.image)), tclvalue(tkwinfo("pointery", 
+            BiplotRegion.image)))
+    }
+    Biplot.plot.SampleGroupMeans <- function() {
+        switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
+            `-1` = {
+                if (g == 1) {
+                  temp1 <- bpar$gSampleGroupMeans.pch
+                  temp2 <- bpar$gSampleGroupMeans.cex
+                  temp3 <- bpar$gSampleGroupMeans.col.fg
+                  temp4 <- bpar$gSampleGroupMeans.col.bg
+                  temp5 <- bpar$gSampleGroupMeans.label.font
+                  temp6 <- bpar$gSampleGroupMeans.label.cex
+                  temp7 <- bpar$gSampleGroupMeans.label.col
+                  temp8 <- bpar$gSampleGroupMeans.label.HorizOffset
+                  temp9 <- bpar$gSampleGroupMeans.label.VertOffset
+                }
+                else {
+                  temp1 <- 22
+                  temp2 <- 2
+                  temp3 <- "black"
+                  temp4 <- "black"
+                  temp5 <- 2
+                  temp6 <- 1
+                  temp7 <- "black"
+                  temp8 <- 0
+                  temp9 <- -1
+                }
+            }, `0` = {
+                temp1 <- bpar$gSampleGroupMeans.pch[groups.in]
+                temp2 <- bpar$gSampleGroupMeans.cex[groups.in]
+                temp3 <- bpar$gSampleGroupMeans.col.fg[groups.in]
+                temp4 <- bpar$gSampleGroupMeans.col.bg[groups.in]
+                temp5 <- bpar$gSampleGroupMeans.label.font[groups.in]
+                temp6 <- bpar$gSampleGroupMeans.label.cex[groups.in]
+                temp7 <- bpar$gSampleGroupMeans.label.col[groups.in]
+                temp8 <- bpar$gSampleGroupMeans.label.HorizOffset[groups.in]
+                temp9 <- bpar$gSampleGroupMeans.label.VertOffset[groups.in]
+            }, {
+                temp1 <- bpar$gSampleGroupMeans.pch[Additional.Interpolate.SampleGroupMeans.for]
+                temp2 <- bpar$gSampleGroupMeans.cex[Additional.Interpolate.SampleGroupMeans.for]
+                temp3 <- bpar$gSampleGroupMeans.col.fg[Additional.Interpolate.SampleGroupMeans.for]
+                temp4 <- bpar$gSampleGroupMeans.col.bg[Additional.Interpolate.SampleGroupMeans.for]
+                temp5 <- bpar$gSampleGroupMeans.label.font[Additional.Interpolate.SampleGroupMeans.for]
+                temp6 <- bpar$gSampleGroupMeans.label.cex[Additional.Interpolate.SampleGroupMeans.for]
+                temp7 <- bpar$gSampleGroupMeans.label.col[Additional.Interpolate.SampleGroupMeans.for]
+                temp8 <- bpar$gSampleGroupMeans.label.HorizOffset[Additional.Interpolate.SampleGroupMeans.for]
+                temp9 <- bpar$gSampleGroupMeans.label.VertOffset[Additional.Interpolate.SampleGroupMeans.for]
+            })
+        if (bpar$SampleGroupMeans.LabelsInBiplot) 
+            text(Additional.Interpolate.SampleGroupMeans.coordinates[, 
+                1] + temp8 * strwidth("x", cex = temp6), Additional.Interpolate.SampleGroupMeans.coordinates[, 
+                2] + temp9 * strheight("x", cex = temp6), labels = Additional.Interpolate.SampleGroupMeans.label.text, 
+                font = temp5, cex = temp6, col = temp7)
+        points(Additional.Interpolate.SampleGroupMeans.coordinates[, 
+            1], Additional.Interpolate.SampleGroupMeans.coordinates[, 
+            2], pch = temp1, cex = temp2, col = temp3, bg = temp4)
+    }
+    Biplot.plot.ConvexHullAlphaBag.bg <- function() {
+        if (Additional.ConvexHullAlphaBag.for == -1) {
+            if (g == 1) 
+                temp1 <- bpar$gConvexHullAlphaBag.col.bg
+            else temp1 <- hcl(0, 0, 90)
+        }
+        else temp1 <- bpar$gConvexHullAlphaBag.col.bg[Additional.ConvexHullAlphaBag.for]
+        polygon(Additional.ConvexHullAlphaBag.coordinates[[1]], 
+            col = temp1, border = NA)
+    }
+    Biplot.plot.ConvexHullAlphaBag.fg <- function() {
+        switch(as.character(Additional.ConvexHullAlphaBag.for), 
+            `-1` = {
+                if (g == 1) {
+                  temp1 <- bpar$gConvexHullAlphaBag.lty
+                  temp2 <- bpar$gConvexHullAlphaBag.lwd
+                  temp3 <- bpar$gConvexHullAlphaBag.col.fg
+                }
+                else {
+                  temp1 <- 1
+                  temp2 <- 4
+                  temp3 <- hcl(0, 0, 60)
+                }
+            }, `0` = {
+                temp1 <- bpar$gConvexHullAlphaBag.lty[groups.in]
+                temp2 <- bpar$gConvexHullAlphaBag.lwd[groups.in]
+                temp3 <- bpar$gConvexHullAlphaBag.col.fg[groups.in]
+            }, {
+                temp1 <- bpar$gConvexHullAlphaBag.lty[Additional.ConvexHullAlphaBag.for]
+                temp2 <- bpar$gConvexHullAlphaBag.lwd[Additional.ConvexHullAlphaBag.for]
+                temp3 <- bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for]
+            })
+        sapply(1:length(temp1), function(x) lines(Additional.ConvexHullAlphaBag.coordinates[[x]], 
+            lty = temp1[x], lwd = temp2[x], col = temp3[x]))
+        if (tclvalue(Additional.AlphaBag.var) == "1" && Additional.ConvexHullAlphaBag.ShowTukeyMedian) {
+            switch(as.character(Additional.ConvexHullAlphaBag.for), 
+                `-1` = {
+                  if (g == 1) {
+                    temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch
+                    temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex
+                    temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg
+                    temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg
+                    temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font
+                    temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex
+                    temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col
+                    temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset
+                    temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset
+                  }
+                  else {
+                    temp4 <- 0
+                    temp5 <- 2
+                    temp6 <- hcl(0, 0, 60)
+                    temp7 <- NA
+                    temp8 <- 3
+                    temp9 <- 1
+                    temp10 <- hcl(0, 0, 60)
+                    temp11 <- 0
+                    temp12 <- -1
+                  }
+                }, `0` = {
+                  temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch[groups.in]
+                  temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex[groups.in]
+                  temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg[groups.in]
+                  temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg[groups.in]
+                  temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font[groups.in]
+                  temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex[groups.in]
+                  temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col[groups.in]
+                  temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset[groups.in]
+                  temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset[groups.in]
+                }, {
+                  temp4 <- bpar$gConvexHullAlphaBag.TukeyMedian.pch[Additional.ConvexHullAlphaBag.for]
+                  temp5 <- bpar$gConvexHullAlphaBag.TukeyMedian.cex[Additional.ConvexHullAlphaBag.for]
+                  temp6 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.fg[Additional.ConvexHullAlphaBag.for]
+                  temp7 <- bpar$gConvexHullAlphaBag.TukeyMedian.col.bg[Additional.ConvexHullAlphaBag.for]
+                  temp8 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.font[Additional.ConvexHullAlphaBag.for]
+                  temp9 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.cex[Additional.ConvexHullAlphaBag.for]
+                  temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col[Additional.ConvexHullAlphaBag.for]
+                  temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset[Additional.ConvexHullAlphaBag.for]
+                  temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset[Additional.ConvexHullAlphaBag.for]
+                })
+            if (bpar$ConvexHullAlphaBag.TukeyMedian.LabelsInBiplot) 
+                text(Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
+                  1] + temp11 * strwidth("x", cex = temp9), Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
+                  2] + temp12 * strheight("x", cex = temp9), 
+                  labels = Additional.ConvexHullAlphaBag.TukeyMedian.label.text, 
+                  font = temp8, cex = temp9, col = temp10)
+            points(Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
+                1], Additional.ConvexHullAlphaBag.TukeyMedian.coordinates[, 
+                2], pch = temp4, cex = temp5, col = temp6, bg = temp7)
+        }
+    }
     Biplot.ZoomIn.cmd <- function() {
         Biplot.zoom.mode <<- 1
         propleft <- 0.5
@@ -8216,6 +7802,535 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             AxesTab.replot()
         PredictionsTab.ArraySetup()
     }
+    Biplot.SendPointToKraal.cmd <- function() {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+            Y <- Biplot.Y_
+        else Y <- Biplot.Y
+        Kraal.moving.type <<- "point"
+        Kraal.moving.which <<- samples.in[which.min(PythagorasDistance(matrix(Biplot.XY.RightClick, 
+            nrow = 1), Y))]
+        Kraal.in.func()
+    }
+    Biplot.SendAxisToKraal.cmd <- function() {
+        if (p.in <= 3) {
+            tkmessageBox(title = "Send to kraal", parent = GUI.TopLevel, 
+                message = "At least three axes must be retained in the biplot.", 
+                icon = "warning", type = "ok")
+            tkfocus(GUI.TopLevel)
+        }
+        else {
+            Kraal.moving.type <<- "axis"
+            if (as.numeric(tclvalue(Biplot.Axes.var)) < 13) {
+                if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
+                  B <- Biplot.B_
+                else B <- Biplot.B
+                Kraal.moving.which <<- variables.in[which.min(PythagorasDistance(matrix(Biplot.XY.RightClick, 
+                  nrow = 1), t(apply(B, 1, function(x) x %*% 
+                  t(x) %*% Biplot.XY.RightClick/sum(x^2)))))]
+            }
+            else {
+                Kraal.moving.which <<- variables.in[which.min(unlist(lapply(Biplot.axis, 
+                  function(mat) {
+                    temp1 <- nrow(mat)
+                    temp2 <- sweep(-mat[-temp1, ], 2, Biplot.XY.RightClick, 
+                      "+")
+                    temp3 <- diff(mat)
+                    temp4 <- rowSums(temp3 * temp2)
+                    temp5 <- rowSums(temp3^2)
+                    temp6 <- ifelse(abs(temp5) < eps, 0, temp4/temp5)
+                    temp6 <- sapply(temp6, function(x) min(max(0, 
+                      x), 1))
+                    min(rowSums(temp2^2) - temp6^2 * temp5)
+                  })))]
+            }
+            Kraal.in.func()
+        }
+    }
+    Biplot.linear.plot3D <- function() {
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
+            Y3D <- Biplot.Y3D_
+            B3D <- Biplot.B3D_
+        }
+        else {
+            Y3D <- Biplot.Y3D
+            B3D <- Biplot.B3D
+        }
+        dimensions <- 1:3
+        if (!boptions$ReuseExternalWindows) 
+            rgl.open()
+        rgl.clear("all")
+        rgl.bg(sphere = TRUE, color = c("whitesmoke", "gray90"), 
+            lit = FALSE)
+        rgl.light()
+        if (tclvalue(Other.HidePoints.var) == "0") {
+            for (temp1 in groups.in) {
+                temp1b <- group[samples.in] == levels(group[samples.in])[temp1]
+                points3d(Y3D[temp1b, 1], Y3D[temp1b, 2], Y3D[temp1b, 
+                  3], col = bparp$points.col.bg[samples.in[temp1b]], 
+                  size = bparp$points.cex[samples.in[temp1b]][1] * 
+                    8, alpha = 0.5)
+            }
+            if (tclvalue(View.ShowPointLabels.var) == "1") 
+                text3d(Y3D[, 1], Y3D[, 2], Y3D[, 3], texts = bparp$points.label.text[samples.in], 
+                  col = bparp$points.label.col[samples.in], family = "sans", 
+                  font = bparp$points.label.font[samples.in], 
+                  cex = bparp$points.label.cex[samples.in])
+        }
+        if (tclvalue(Other.HideAxes.var) == "0") {
+            radiustemp <- 0
+            for (i in 1:p.in) {
+                PrettyMarkers <- zapsmall(pretty(Data[samples.in, 
+                  variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]))
+                ttemp <- max(max(nchar(format(abs(PrettyMarkers) - 
+                  trunc(abs(PrettyMarkers))))) - 2, 0)
+                PrettyMarkersCharacter <- format(PrettyMarkers, 
+                  nsmall = ttemp, trim = TRUE)
+                mu <- SettingsBox.transformation.func(IN = pretty(Data[samples.in, 
+                  variables.in[i]], n = bpar$axes.tick.n[variables.in[i]]), 
+                  WhichCol = i)
+                WhichRemove <- which(abs(mu) == Inf)
+                if (length(WhichRemove) > 0) {
+                  PrettyMarkers <- PrettyMarkers[-WhichRemove]
+                  PrettyMarkersCharacter <- PrettyMarkersCharacter[-WhichRemove]
+                  mu <- mu[-WhichRemove]
+                }
+                Coord <- t(sapply(mu, function(a) B3D[i, ] * 
+                  a))
+                if (tclvalue(tkget(SettingsBox.action.combo)) == 
+                  "Predict") 
+                  Coord <- Coord/sum(B3D[i, ]^2)
+                else if (tclvalue(tkget(SettingsBox.action.combo)) == 
+                  "Interpolate: centroid") 
+                  Coord <- Coord * p.in
+                if ((temp0 <- max(apply(Coord, 1, function(x) sum(x^2)^0.5))) > 
+                  radiustemp) 
+                  radiustemp <- temp0
+                text3d(Coord, texts = PrettyMarkersCharacter, 
+                  col = bpar$axes.marker.col[variables.in[i]], 
+                  family = "sans", font = bpar$axes.marker.font[variables.in[i]], 
+                  cex = bpar$axes.marker.cex[variables.in[i]])
+            }
+            radius <- max(apply(Y3D, 1, function(x) sum(x^2)^0.5), 
+                radiustemp) * 1.1
+            axes <- sweep(B3D, 1, 1/apply(B3D, 1, function(x) sum(x^2)^0.5) * 
+                radius, "*")
+            temp2 <- matrix(0, nrow = 2 * p.in, ncol = 3)
+            temp2[seq(2, nrow(temp2), by = 2) - 1, ] <- -axes
+            temp2[seq(2, nrow(temp2), by = 2), ] <- axes
+            for (temp3 in 1:p.in) segments3d(temp2[(temp3 * 2 - 
+                1):(temp3 * 2), ], col = rep(bpar$axes.col[variables.in[temp3]], 
+                each = 2), size = bpar$axes.lwd[variables.in[temp3]])
+            if (tclvalue(View.AxisLabels.var) != "0") {
+                text3d(axes * 1.02, texts = paste(bpar$axes.label.text[variables.in], 
+                  "+", sep = ""), family = "sans", font = bpar$axes.label.font[variables.in], 
+                  cex = bpar$axes.label.cex[variables.in], col = bpar$axes.label.col[variables.in])
+                text3d(-axes * 1.02, texts = paste(bpar$axes.label.text[variables.in], 
+                  "-", sep = ""), family = "sans", font = bpar$axes.label.font[variables.in], 
+                  cex = bpar$axes.label.cex[variables.in], col = bpar$axes.label.col[variables.in])
+            }
+        }
+        aspect3d("iso")
+        lims <- par3d("bbox")
+        segments3d(matrix(c(lims[1], lims[3], lims[5], lims[2], 
+            lims[3], lims[5], lims[1], lims[3], lims[5], lims[1], 
+            lims[4], lims[5], lims[1], lims[3], lims[5], lims[1], 
+            lims[3], lims[6]), byrow = TRUE, ncol = 3), col = "gray60")
+        text3d(matrix(c((lims[1] + lims[2])/2, lims[3], lims[5], 
+            lims[1], (lims[3] + lims[4])/2, lims[5], lims[1], 
+            lims[3], (lims[5] + lims[6])/2), byrow = TRUE, nrow = 3), 
+            texts = paste("Dimension ", dimensions), col = "gray60", 
+            family = "sans", font = 1, cex = 1)
+        if (tclvalue(View.ShowTitle.var) == "1") 
+            title3d(Biplot.title, color = "black", family = "sans", 
+                font = 2, cex = 1)
+        par3d(mouseMode = boptions$ThreeD.MouseButtonAction)
+        light3d(theta = 0, phi = 15)
+        if (boptions$ThreeD.FlyBy) {
+            start <- proc.time()[3]
+            while (proc.time()[3] - start < 0.75) {
+            }
+            start <- proc.time()[3]
+            while ((i <- 36 * (proc.time()[3] - start)) < 360) rgl.viewpoint(i, 
+                15 - (i - 90)/4, zoom = (if (i < 180) 
+                  (i + 1)^-0.5
+                else (360 - i + 1)^-0.5))
+            rgl.viewpoint(zoom = 1)
+        }
+    }
+    Biplot.NonLinear.plot3D <- function() {
+        if (tclvalue(tkget(SettingsBox.action.combo)) == "Predict") {
+            Axes.CircularNonLinear.determine(rho = 3)
+            O3D <- Axes.CircularNonLinear.g
+        }
+        else O3D <- Biplot.O3D
+        dimensions <- 1:3
+        if (!boptions$ReuseExternalWindows) 
+            rgl.open()
+        rgl.clear("all")
+        rgl.bg(sphere = TRUE, color = c("whitesmoke", "gray90"), 
+            lit = FALSE)
+        rgl.light()
+        if (tclvalue(Other.HidePoints.var) == "0") {
+            for (temp1 in groups.in) {
+                temp1b <- group[samples.in] == levels(group[samples.in])[temp1]
+                points3d(Y3D[temp1b, 1], Y3D[temp1b, 2], Y3D[temp1b, 
+                  3], col = bparp$points.col.bg[samples.in[temp1b]], 
+                  size = bparp$points.cex[samples.in[temp1b]][1] * 
+                    8, alpha = 0.5)
+            }
+            if (tclvalue(View.ShowPointLabels.var) == "1") 
+                text3d(Y3D[, 1], Y3D[, 2], Y3D[, 3], texts = bparp$points.label.text[samples.in], 
+                  col = bparp$points.label.col[samples.in], family = "sans", 
+                  font = bparp$points.label.font[samples.in], 
+                  cex = bparp$points.label.cex[samples.in])
+        }
+        if (tclvalue(Other.HideAxes.var) == "0") 
+            for (i in 1:p.in) text3d(Biplot.axis3D[[i]][Biplot.variable[[i]]$PrettyMarkersIndex, 
+                ], texts = Biplot.variable[[i]]$PrettyMarkersCharacter, 
+                col = bpar$axes.marker.col[variables.in[i]], 
+                family = "sans", font = bpar$axes.marker.font[variables.in[i]], 
+                cex = bpar$axes.marker.cex[variables.in[i]])
+        if (tclvalue(Other.HideAxes.var) == "0") {
+            for (i in 1:p.in) lines3d(Biplot.axis3D[[i]], col = bpar$axes.col[variables.in[i]], 
+                size = bpar$axes.lwd[variables.in[i]])
+            if (tclvalue(View.AxisLabels.var) != "0") 
+                for (i in 1:p.in) text3d(Biplot.axis3D[[i]][c(1, 
+                  nrow(Biplot.axis3D[[i]])), ], texts = paste(bpar$axes.label.text[variables.in[i]], 
+                  c("-", "+"), sep = ""), col = bpar$axes.label.col[variables.in[i]], 
+                  family = "sans", font = bpar$axes.label.font[variables.in], 
+                  cex = bpar$axes.label.cex[variables.in])
+        }
+        furthest <- max(unlist(lapply(Biplot.axis3D, function(x) max(abs(sweep(x, 
+            2, O3D, "-"))))), abs(sweep(Biplot.Y3D, 2, O3D, "-")))
+        furthestmat <- matrix(c(O3D[1] + furthest, 0, 0, O3D[1] - 
+            furthest, 0, 0, 0, O3D[2] + furthest, 0, 0, O3D[2] - 
+            furthest, 0, 0, 0, O3D[3] + furthest, 0, 0, O3D[3] - 
+            furthest), ncol = 3, byrow = TRUE)
+        points3d(furthestmat[, 1], furthestmat[, 2], furthestmat[, 
+            3], col = "white")
+        aspect3d("iso")
+        lims <- par3d("bbox")
+        segments3d(matrix(c(lims[1], lims[3], lims[5], lims[2], 
+            lims[3], lims[5], lims[1], lims[3], lims[5], lims[1], 
+            lims[4], lims[5], lims[1], lims[3], lims[5], lims[1], 
+            lims[3], lims[6]), byrow = TRUE, ncol = 3), col = "gray60")
+        text3d(matrix(c((lims[1] + lims[2])/2, lims[3], lims[5], 
+            lims[1], (lims[3] + lims[4])/2, lims[5], lims[1], 
+            lims[3], (lims[5] + lims[6])/2), byrow = TRUE, nrow = 3), 
+            texts = paste("Dimension ", dimensions), col = "gray60", 
+            family = "sans", font = 1, cex = 1)
+        if (tclvalue(View.ShowTitle.var) == "1") 
+            title3d(Biplot.title, color = "black", family = "sans", 
+                font = 2, cex = 1)
+        par3d(mouseMode = boptions$ThreeD.MouseButtonAction)
+        light3d(theta = 0, phi = 15)
+        if (boptions$ThreeD.FlyBy) {
+            start <- proc.time()[3]
+            while (proc.time()[3] - start < 0.75) {
+            }
+            start <- proc.time()[3]
+            while ((i <- 36 * (proc.time()[3] - start)) < 360) rgl.viewpoint(i, 
+                15 - (i - 90)/4, zoom = (if (i < 180) 
+                  (i + 1)^-0.5
+                else (360 - i + 1)^-0.5))
+            rgl.viewpoint(zoom = 1)
+        }
+    }
+    Legend.par <- NULL
+    Legend.ConvertCoordinates <- NULL
+    Legend.coordinates <- NULL
+    Legend.fraction <- NULL
+    Legend.CurrentPage <- 1
+    Legend.CurrentIndices <- NULL
+    Legend.LastPage <- NULL
+    Legend.legend <- NULL
+    Legend.text.col <- NULL
+    Legend.lty <- NULL
+    Legend.lwd <- NULL
+    Legend.lines.col <- NULL
+    Legend.pch <- NULL
+    Legend.pt.cex <- NULL
+    Legend.points.col <- NULL
+    Legend.pt.bg <- NULL
+    Legend.yes <- function() tclvalue(View.ShowGroupLabelsInLegend.var) == 
+        "1" || tclvalue(View.AxisLabels.var) == "2" || tclvalue(View.ShowAdditionalLabelsInLegend.var) == 
+        "1" && (tclvalue(Additional.Interpolate.ANewSample.var) == 
+        "1" && !bpar$ANewSample.LabelsInBiplot || tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
+        "1" && !bpar$SampleGroupMeans.LabelsInBiplot || tclvalue(Additional.ConvexHull.var) == 
+        "1" || tclvalue(Additional.AlphaBag.var) == "1" || tclvalue(Additional.ClassificationRegion.var) == 
+        "1")
+    Legend.func <- function() {
+        Legend.legend <<- NULL
+        Legend.text.col <<- NULL
+        Legend.lty <<- NULL
+        Legend.lwd <<- NULL
+        Legend.lines.col <<- NULL
+        Legend.pch <<- NULL
+        Legend.pt.cex <<- NULL
+        Legend.points.col <<- NULL
+        Legend.pt.bg <<- NULL
+        if (tclvalue(View.ShowGroupLabelsInLegend.var) == "1") {
+            Legend.legend <<- bpar$groups.label.text[groups.in]
+            Legend.text.col <<- rep("black", g.in)
+            Legend.lty <<- rep(1, g.in)
+            Legend.lwd <<- rep(1, g.in)
+            Legend.lines.col <<- rep(NA, g.in)
+            Legend.pch <<- bpar$gpoints.pch[groups.in]
+            Legend.pt.cex <<- bpar$gpoints.cex[groups.in]
+            Legend.points.col <<- bpar$gpoints.col.fg[groups.in]
+            Legend.pt.bg <<- bpar$gpoints.col.bg[groups.in]
+        }
+        if (tclvalue(View.AxisLabels.var) == "2") {
+            Legend.legend <<- c(Legend.legend, bpar$axes.label.text[variables.in])
+            Legend.text.col <<- c(Legend.text.col, rep("black", 
+                p.in))
+            Legend.lty <<- c(Legend.lty, bpar$axes.lty[variables.in])
+            Legend.lwd <<- c(Legend.lwd, bpar$axes.lwd[variables.in])
+            if (Biplot.axes.mode == 0) 
+                Legend.lines.col <<- c(Legend.lines.col, bpar$axes.col[variables.in])
+            else {
+                temp1 <- rep(bpar$interaction.highlight.axes.col.bg, 
+                  p.in)
+                temp1[variables.in == Biplot.axes.WhichHighlight] <- bpar$interaction.highlight.axes.col.fg
+                Legend.lines.col <<- c(Legend.lines.col, temp1)
+            }
+            Legend.pch <<- c(Legend.pch, rep(NA, p.in))
+            Legend.pt.cex <<- c(Legend.pt.cex, rep(NA, p.in))
+            Legend.points.col <<- c(Legend.points.col, rep(NA, 
+                p.in))
+            Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, p.in))
+        }
+        if (tclvalue(View.ShowAdditionalLabelsInLegend.var) == 
+            "1") {
+            if (tclvalue(Additional.Interpolate.ANewSample.var) == 
+                "1" && !bpar$ANewSample.LabelsInBiplot) {
+                Legend.legend <<- c(Legend.legend, bpar$ANewSample.label.text)
+                Legend.text.col <<- c(Legend.text.col, "black")
+                Legend.lty <<- c(Legend.lty, 1)
+                Legend.lwd <<- c(Legend.lwd, 1)
+                Legend.lines.col <<- c(Legend.lines.col, NA)
+                Legend.pch <<- c(Legend.pch, bpar$ANewSample.pch)
+                Legend.pt.cex <<- c(Legend.pt.cex, bpar$ANewSample.cex)
+                Legend.points.col <<- c(Legend.points.col, bpar$ANewSample.col.fg)
+                Legend.pt.bg <<- c(Legend.pt.bg, bpar$ANewSample.col.bg)
+            }
+            if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
+                "1" && !bpar$SampleGroupMeans.LabelsInBiplot) {
+                switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
+                  `-1` = {
+                    Legend.legend <<- c(Legend.legend, "SGM: All samples")
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, 1)
+                    Legend.lwd <<- c(Legend.lwd, 1)
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      NA)
+                    Legend.pch <<- c(Legend.pch, 22)
+                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
+                    Legend.points.col <<- c(Legend.points.col, 
+                      "black")
+                    Legend.pt.bg <<- c(Legend.pt.bg, "black")
+                  }, `0` = {
+                    Legend.legend <<- c(Legend.legend, paste("SGM:", 
+                      bpar$groups.label.text[groups.in]))
+                    Legend.text.col <<- c(Legend.text.col, rep("black", 
+                      g.in))
+                    Legend.lty <<- c(Legend.lty, rep(1, g.in))
+                    Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      rep(NA, g.in))
+                    Legend.pch <<- c(Legend.pch, bpar$gSampleGroupMeans.pch[groups.in])
+                    Legend.pt.cex <<- c(Legend.pt.cex, bpar$gSampleGroupMeans.cex[groups.in])
+                    Legend.points.col <<- c(Legend.points.col, 
+                      bpar$gSampleGroupMeans.col.fg[groups.in])
+                    Legend.pt.bg <<- c(Legend.pt.bg, bpar$gSampleGroupMeans.col.bg[groups.in])
+                  }, {
+                    Legend.legend <<- c(Legend.legend, paste("SGM:", 
+                      bpar$groups.label.text[Additional.Interpolate.SampleGroupMeans.for]))
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, 1)
+                    Legend.lwd <<- c(Legend.lwd, 1)
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      NA)
+                    Legend.pch <<- c(Legend.pch, bpar$gSampleGroupMeans.pch[Additional.Interpolate.SampleGroupMeans.for])
+                    Legend.pt.cex <<- c(Legend.pt.cex, bpar$gSampleGroupMeans.cex[Additional.Interpolate.SampleGroupMeans.for])
+                    Legend.points.col <<- c(Legend.points.col, 
+                      bpar$gSampleGroupMeans.col.fg[Additional.Interpolate.SampleGroupMeans.for])
+                    Legend.pt.bg <<- c(Legend.pt.bg, bpar$gSampleGroupMeans.col.bg[Additional.Interpolate.SampleGroupMeans.for])
+                  })
+            }
+            if (tclvalue(Additional.ConvexHull.var) == "1" || 
+                tclvalue(Additional.AlphaBag.var) == "1") {
+                switch(as.character(Additional.ConvexHullAlphaBag.for), 
+                  `-1` = {
+                    if (tclvalue(Additional.ConvexHull.var) == 
+                      "1") 
+                      Legend.legend <<- c(Legend.legend, "CH: All points")
+                    else Legend.legend <<- c(Legend.legend, "AB: All points")
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, if (g == 1) bpar$gConvexHullAlphaBag.lty else 1)
+                    Legend.lwd <<- c(Legend.lwd, if (g == 1) bpar$gConvexHullAlphaBag.lwd else 4)
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      if (g == 1) bpar$gConvexHullAlphaBag.col.fg else hcl(0, 
+                        0, 60))
+                    Legend.pch <<- c(Legend.pch, NA)
+                    Legend.pt.cex <<- c(Legend.pt.cex, NA)
+                    Legend.points.col <<- c(Legend.points.col, 
+                      NA)
+                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
+                  }, `0` = {
+                    if (tclvalue(Additional.ConvexHull.var) == 
+                      "1") 
+                      Legend.legend <<- c(Legend.legend, paste("CH:", 
+                        bpar$groups.label.text[groups.in]))
+                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
+                      bpar$groups.label.text[groups.in]))
+                    Legend.text.col <<- c(Legend.text.col, rep("black", 
+                      g.in))
+                    Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[groups.in])
+                    Legend.lwd <<- c(Legend.lwd, bpar$gConvexHullAlphaBag.lwd[groups.in])
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      bpar$gConvexHullAlphaBag.col.fg[groups.in])
+                    Legend.pch <<- c(Legend.pch, rep(NA, g.in))
+                    Legend.pt.cex <<- c(Legend.pt.cex, rep(NA, 
+                      g.in))
+                    Legend.points.col <<- c(Legend.points.col, 
+                      rep(NA, g.in))
+                    Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, 
+                      g.in))
+                  }, {
+                    if (tclvalue(Additional.ConvexHull.var) == 
+                      "1") 
+                      Legend.legend <<- c(Legend.legend, paste("CH:", 
+                        bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
+                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
+                      bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[Additional.ConvexHullAlphaBag.for])
+                    Legend.lwd <<- c(Legend.lwd, bpar$gConvexHullAlphaBag.lwd[Additional.ConvexHullAlphaBag.for])
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for])
+                    Legend.pch <<- c(Legend.pch, NA)
+                    Legend.pt.cex <<- c(Legend.pt.cex, NA)
+                    Legend.points.col <<- c(Legend.points.col, 
+                      NA)
+                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
+                  })
+            }
+            if (tclvalue(Additional.AlphaBag.var) == "1" && Additional.ConvexHullAlphaBag.ShowTukeyMedian && 
+                !bpar$ConvexHullAlphaBag.TukeyMedian.LabelsInBiplot) {
+                switch(as.character(Additional.ConvexHullAlphaBag.for), 
+                  `-1` = {
+                    Legend.legend <<- c(Legend.legend, "TM: All points")
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, 1)
+                    Legend.lwd <<- c(Legend.lwd, 1)
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      NA)
+                    Legend.pch <<- c(Legend.pch, 0)
+                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
+                    Legend.points.col <<- c(Legend.points.col, 
+                      if (g == 1) bpar$gConvexHullAlphaBag.col.fg else hcl(0, 
+                        0, 60))
+                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
+                  }, `0` = {
+                    Legend.legend <<- c(Legend.legend, paste("TM:", 
+                      bpar$groups.label.text[groups.in]))
+                    Legend.text.col <<- c(Legend.text.col, rep("black", 
+                      g.in))
+                    Legend.lty <<- c(Legend.lty, rep(1, g.in))
+                    Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      rep(NA, g.in))
+                    Legend.pch <<- c(Legend.pch, rep(0, g.in))
+                    Legend.pt.cex <<- c(Legend.pt.cex, rep(2, 
+                      g.in))
+                    Legend.points.col <<- c(Legend.points.col, 
+                      bpar$gConvexHullAlphaBag.col.fg[groups.in])
+                    Legend.pt.bg <<- c(Legend.pt.bg, rep(NA, 
+                      g.in))
+                  }, {
+                    Legend.legend <<- c(Legend.legend, paste("TM:", 
+                      bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
+                    Legend.text.col <<- c(Legend.text.col, "black")
+                    Legend.lty <<- c(Legend.lty, 1)
+                    Legend.lwd <<- c(Legend.lwd, 1)
+                    Legend.lines.col <<- c(Legend.lines.col, 
+                      NA)
+                    Legend.pch <<- c(Legend.pch, 0)
+                    Legend.pt.cex <<- c(Legend.pt.cex, 2)
+                    Legend.points.col <<- c(Legend.points.col, 
+                      bpar$gConvexHullAlphaBag.col.fg[Additional.ConvexHullAlphaBag.for])
+                    Legend.pt.bg <<- c(Legend.pt.bg, NA)
+                  })
+            }
+            if (tclvalue(Additional.ClassificationRegion.var) == 
+                "1") {
+                Legend.legend <<- c(Legend.legend, paste("CR:", 
+                  bpar$groups.label.text[groups.in]))
+                Legend.text.col <<- c(Legend.text.col, rep("black", 
+                  g.in))
+                Legend.lty <<- c(Legend.lty, rep(1, g.in))
+                Legend.lwd <<- c(Legend.lwd, rep(1, g.in))
+                Legend.lines.col <<- c(Legend.lines.col, rep(NA, 
+                  g.in))
+                Legend.pch <<- c(Legend.pch, rep(22, g.in))
+                Legend.pt.cex <<- c(Legend.pt.cex, rep(2, g.in))
+                Legend.points.col <<- c(Legend.points.col, bpar$gClassificationRegion.col.bg[groups.in])
+                Legend.pt.bg <<- c(Legend.pt.bg, bpar$gClassificationRegion.col.bg[groups.in])
+            }
+        }
+        Legend.legend <<- substr(Legend.legend, start = 1, stop = 14)
+        Legend.LastPage <<- (length(Legend.legend) - 1)%/%16 + 
+            1
+        if (Legend.CurrentPage > Legend.LastPage) 
+            Legend.CurrentPage <<- Legend.LastPage
+        if (Legend.CurrentPage < Legend.LastPage) {
+            tkentryconfigure(MenuBar.View, 16, state = "normal")
+            tkentryconfigure(Biplot.RightClickOutside.Menu, 11, 
+                state = "normal")
+            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
+                6, state = "normal")
+        }
+        else {
+            tkentryconfigure(MenuBar.View, 16, state = "disabled")
+            tkentryconfigure(Biplot.RightClickOutside.Menu, 11, 
+                state = "disabled")
+            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
+                6, state = "disabled")
+        }
+        if (Legend.CurrentPage > 1) {
+            tkentryconfigure(MenuBar.View, 17, state = "normal")
+            tkentryconfigure(Biplot.RightClickOutside.Menu, 12, 
+                state = "normal")
+            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
+                7, state = "normal")
+        }
+        else {
+            tkentryconfigure(MenuBar.View, 17, state = "disabled")
+            tkentryconfigure(Biplot.RightClickOutside.Menu, 12, 
+                state = "disabled")
+            tkentryconfigure(Biplot.None.RightClickOutside.Menu, 
+                7, state = "disabled")
+        }
+        Legend.CurrentIndices <<- ((Legend.CurrentPage - 1) * 
+            16 + 1):(min(Legend.CurrentPage * 16, length(Legend.legend)))
+        legend2(x = "center", legend = Legend.transpose(Legend.legend[Legend.CurrentIndices]), 
+            cex = 0.85, text.width = strwidth("12345678901234", 
+                cex = 0.85), text.col = Legend.transpose(Legend.text.col[Legend.CurrentIndices]), 
+            ncol = 4, lty = Legend.transpose(Legend.lty[Legend.CurrentIndices]), 
+            lwd = Legend.transpose(Legend.lwd[Legend.CurrentIndices]), 
+            lines.col = Legend.transpose(Legend.lines.col[Legend.CurrentIndices]), 
+            pch = Legend.transpose(Legend.pch[Legend.CurrentIndices]), 
+            pt.cex = Legend.transpose(Legend.pt.cex[Legend.CurrentIndices]), 
+            col = Legend.transpose(Legend.points.col[Legend.CurrentIndices]), 
+            pt.bg = Legend.transpose(Legend.pt.bg[Legend.CurrentIndices]))
+    }
+    Legend.transpose <- function(temp1) {
+        temp2 <- c(temp1)
+        temp3 <- matrix(nrow = 4, ncol = 4)
+        temp3[1:length(temp2)] <- temp2
+        c(t(temp3))
+    }
     Biplot.RightClickInside.Menu <- tk2menu(BiplotRegion.image, 
         tearoff = FALSE)
     tkadd(Biplot.RightClickInside.Menu, "command", label = "Zoom in", 
@@ -8279,14 +8394,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(Biplot.RightClickInside.Menu, "cascade", label = "Save as", 
         menu = MenuBar.File.SaveAs)
     tkadd(Biplot.RightClickInside.Menu, "command", label = "Copy", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Copy.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.RightClickInside.Menu, "separator")
     tkadd(Biplot.RightClickInside.Menu, "command", label = "Print...", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Print.cmd()
             GUI.BindingsOn()
@@ -8322,27 +8441,22 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(Biplot.None.RightClickInside.Menu, "cascade", label = "Save as", 
         menu = MenuBar.File.SaveAs)
     tkadd(Biplot.None.RightClickInside.Menu, "command", label = "Copy", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Copy.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.None.RightClickInside.Menu, "separator")
     tkadd(Biplot.None.RightClickInside.Menu, "command", label = "Print...", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Print.cmd()
             GUI.BindingsOn()
         })
-    Biplot.SendPointToKraal.cmd <- function() {
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-            Y <- Biplot.Y_
-        else Y <- Biplot.Y
-        Kraal.moving.type <<- "point"
-        Kraal.moving.which <<- samples.in[which.min(PythagorasDistance(matrix(Biplot.XY.RightClick, 
-            nrow = 1), Y))]
-        Kraal.in.func()
-    }
     Biplot.RightClickOnPoint.Menu <- tk2menu(BiplotRegion.image, 
         tearoff = FALSE)
     tkadd(Biplot.RightClickOnPoint.Menu, "command", label = "Send to kraal", 
@@ -8367,41 +8481,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Format.ByGroup.cmd(temp2)
             GUI.BindingsOn()
         })
-    Biplot.SendAxisToKraal.cmd <- function() {
-        if (p.in <= 3) {
-            tkmessageBox(title = "Send to kraal", parent = GUI.TopLevel, 
-                message = "At least three axes must be retained in the biplot.", 
-                icon = "warning", type = "ok")
-            tkfocus(GUI.TopLevel)
-        }
-        else {
-            Kraal.moving.type <<- "axis"
-            if (as.numeric(tclvalue(Biplot.Axes.var)) < 13) {
-                if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) 
-                  B <- Biplot.B_
-                else B <- Biplot.B
-                Kraal.moving.which <<- variables.in[which.min(PythagorasDistance(matrix(Biplot.XY.RightClick, 
-                  nrow = 1), t(apply(B, 1, function(x) x %*% 
-                  t(x) %*% Biplot.XY.RightClick/sum(x^2)))))]
-            }
-            else {
-                Kraal.moving.which <<- variables.in[which.min(unlist(lapply(Biplot.axis, 
-                  function(mat) {
-                    temp1 <- nrow(mat)
-                    temp2 <- sweep(-mat[-temp1, ], 2, Biplot.XY.RightClick, 
-                      "+")
-                    temp3 <- diff(mat)
-                    temp4 <- rowSums(temp3 * temp2)
-                    temp5 <- rowSums(temp3^2)
-                    temp6 <- ifelse(abs(temp5) < eps, 0, temp4/temp5)
-                    temp6 <- sapply(temp6, function(x) min(max(0, 
-                      x), 1))
-                    min(rowSums(temp2^2) - temp6^2 * temp5)
-                  })))]
-            }
-            Kraal.in.func()
-        }
-    }
     Biplot.RightClickOnAxis.Menu <- tk2menu(BiplotRegion.image, 
         tearoff = FALSE)
     tkadd(Biplot.RightClickOnAxis.Menu, "command", label = "Highlight", 
@@ -8501,27 +8580,31 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(Biplot.RightClickOutside.Menu, "command", label = "Show next legend entries", 
         command = function() {
             GUI.BindingsOff()
-            Legend.NextPage.cmd()
+            View.ShowNextLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.RightClickOutside.Menu, "command", label = "Show previous legend entries", 
         command = function() {
             GUI.BindingsOff()
-            Legend.PrevPage.cmd()
+            View.ShowPreviousLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.RightClickOutside.Menu, "separator")
     tkadd(Biplot.RightClickOutside.Menu, "cascade", label = "Save as", 
         menu = MenuBar.File.SaveAs)
     tkadd(Biplot.RightClickOutside.Menu, "command", label = "Copy", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Copy.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.RightClickOutside.Menu, "separator")
     tkadd(Biplot.RightClickOutside.Menu, "command", label = "Print...", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Print.cmd()
             GUI.BindingsOn()
@@ -8562,206 +8645,45 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkadd(Biplot.None.RightClickOutside.Menu, "command", label = "Show next legend entries", 
         command = function() {
             GUI.BindingsOff()
-            Legend.NextPage.cmd()
+            View.ShowNextLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.None.RightClickOutside.Menu, "command", label = "Show previous legend entries", 
         command = function() {
             GUI.BindingsOff()
-            Legend.PrevPage.cmd()
+            View.ShowPreviousLegendEntries.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.None.RightClickOutside.Menu, "separator")
     tkadd(Biplot.None.RightClickOutside.Menu, "cascade", label = "Save as", 
         menu = MenuBar.File.SaveAs)
     tkadd(Biplot.None.RightClickOutside.Menu, "command", label = "Copy", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Copy.cmd()
             GUI.BindingsOn()
         })
     tkadd(Biplot.None.RightClickOutside.Menu, "separator")
     tkadd(Biplot.None.RightClickOutside.Menu, "command", label = "Print...", 
-        command = function() {
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
             GUI.BindingsOff()
             File.Print.cmd()
             GUI.BindingsOn()
         })
-    ControlButtons.frame <- tkframe(GUI.TopLevel, relief = "groove", 
-        borderwidth = "1.5p")
-    ControlButtons.ProgressBar.pb <- tk2progress(ControlButtons.frame, 
-        mode = "determinate")
-    ControlButtons.ProgressBar.create <- function() tkplace(ControlButtons.ProgressBar.pb, 
-        relx = 0.005, rely = 0.5, relwidth = 0.1, height = 18, 
-        "in" = ControlButtons.frame, anchor = "w")
-    ControlButtons.ProgressBar.create()
-    ControlButtons.ProgressBar.destroy <- function() tkplace(ControlButtons.ProgressBar.pb, 
-        width = 0, height = 0)
-    ControlButtons.DisplayInExternalWindow.AsIs.cmd <- function() {
-        .Tcl("update")
-        if (boptions$ReuseExternalWindows && dev.cur() > 1) 
-            graphics.off()
-        x11(width = 7, height = 7)
-        Biplot.plot()
-        .Tcl("update")
-    }
-    ControlButtons.DisplayInExternalWindow.In3D.cmd <- function() {
-        if (data.class(try(.find.package("rgl"), TRUE)) == "try-error") {
-            tkmessageBox(title = "In 3D", parent = GUI.TopLevel, 
-                message = "This option requires the `rgl' package. \nPlease download and install.", 
-                icon = "info", type = "ok")
-            tkfocus(GUI.TopLevel)
-        }
-        else {
-            require("rgl", quietly = TRUE)
-            Biplot.plot3D()
-        }
-    }
-    ControlButtons.External.but <- tk2menubutton(ControlButtons.frame, 
-        text = "External", direction = "above")
-    ControlButtons.External.menu <- tk2menu(MenuBar.menu, tearoff = FALSE)
-    tkadd(ControlButtons.External.menu, "command", label = "As is", 
-        underline = "3", accelerator = "F11", command = function() {
-            GUI.BindingsOff()
-            ControlButtons.DisplayInExternalWindow.AsIs.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ControlButtons.External.menu, "command", label = "In 3D", 
-        underline = "3", accelerator = "F12", command = function() {
-            GUI.BindingsOff()
-            ControlButtons.DisplayInExternalWindow.In3D.cmd()
-            GUI.BindingsOn()
-        })
-    tkconfigure(ControlButtons.External.but, menu = ControlButtons.External.menu)
-    tkplace(ControlButtons.External.but, relx = 0.12, rely = 0.5, 
-        relwidth = 0.075, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.HidePoints.var <- tclVar("0")
-    ControlButtons.HidePoints.cmd <- function() {
-        if (tclvalue(ControlButtons.HidePoints.var) == "1") {
-            View.ShowPointValues.var <<- tclVar("0")
-            View.ShowGroupLabelsInLegend.var <<- tclVar("0")
-            if (tclvalue(Biplot.points.mode) == "2") 
-                Biplot.points.mode <<- tclVar("1")
-        }
-        else {
-            View.ShowPointValues.var <<- tclVar("1")
-            if (g > 1) 
-                View.ShowGroupLabelsInLegend.var <<- tclVar("1")
-        }
-        Biplot.replot()
-    }
-    ControlButtons.HideAxes.var <- tclVar("0")
-    ControlButtons.HideAxes.cmd <- function() {
-        if (tclvalue(ControlButtons.HideAxes.var) == "1") {
-            View.AxisLabels.var <<- tclVar("-1")
-            Biplot.points.mode <<- tclVar("-1")
-        }
-        else {
-            if (tclvalue(Biplot.Axes.var) %in% c("13", "14")) 
-                View.AxisLabels.var <<- tclVar("2")
-            else View.AxisLabels.var <<- tclVar("1")
-            Biplot.points.mode <<- tclVar("0")
-        }
-        Biplot.replot()
-    }
-    ControlButtons.Hide.but <- tk2menubutton(ControlButtons.frame, 
-        text = "Hide", direction = "above")
-    ControlButtons.Hide.menu <- tk2menu(MenuBar.menu, tearoff = FALSE)
-    tkadd(ControlButtons.Hide.menu, "checkbutton", label = "Points", 
-        underline = "0", variable = ControlButtons.HidePoints.var, 
-        command = function() {
-            GUI.BindingsOff()
-            ControlButtons.HidePoints.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ControlButtons.Hide.menu, "checkbutton", label = "Axes", 
-        underline = "0", variable = ControlButtons.HideAxes.var, 
-        command = function() {
-            GUI.BindingsOff()
-            ControlButtons.HideAxes.cmd()
-            GUI.BindingsOn()
-        })
-    tkconfigure(ControlButtons.Hide.but, menu = ControlButtons.Hide.menu)
-    tkplace(ControlButtons.Hide.but, relx = 0.2075, rely = 0.5, 
-        relwidth = 0.055, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.LiveUpdates.var <- tclVar("1")
-    ControlButtons.LiveUpdates.chk <- tk2checkbutton(ControlButtons.frame, 
-        text = "Live updates", variable = ControlButtons.LiveUpdates.var)
-    tkplace(ControlButtons.LiveUpdates.chk, relx = 0.29, rely = 0.5, 
-        relwidth = 0.0745, relheight = 0.625, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.Stop.var <- FALSE
-    ControlButtons.Stop.cmd <- function() {
-        ControlButtons.Stop.var <<- TRUE
-    }
-    ControlButtons.Stop.but <- tk2button(ControlButtons.frame, 
-        text = "Stop", state = "disabled", command = function() {
-            GUI.BindingsOff()
-            ControlButtons.Stop.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(ControlButtons.Stop.but, relx = 0.405, rely = 0.5, 
-        relwidth = 0.07, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.ReturnPoints.but <- tk2button(ControlButtons.frame, 
-        text = "Return points", state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnPoints.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(ControlButtons.ReturnPoints.but, relx = 0.6703 + 
-        0.005, rely = 0.5, relwidth = 0.075, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.ReturnAxes.but <- tk2button(ControlButtons.frame, 
-        text = "Return axes", state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnAxes.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(ControlButtons.ReturnAxes.but, relx = 0.765 + 0.005, 
-        rely = 0.5, relwidth = 0.075, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    ControlButtons.ReturnAll.but <- tk2button(ControlButtons.frame, 
-        text = "Return all", state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnAll.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(ControlButtons.ReturnAll.but, relx = 0.8597 + 0.005, 
-        rely = 0.5, relwidth = 0.075, height = 22, "in" = ControlButtons.frame, 
-        anchor = "w")
-    tkplace(ControlButtons.frame, relx = 0.005, rely = 0.95, 
-        relwidth = 0.99, relheight = 0.045, "in" = GUI.TopLevel)
-    SettingsBox.frame <- tkframe(GUI.TopLevel, relief = "groove", 
-        borderwidth = "1.5p")
-    tkplace(SettingsBox.frame, relx = 0.61, rely = 0.6, relwidth = 0.385, 
-        relheight = 0.06, "in" = GUI.TopLevel)
-    tkplace(tklabel(SettingsBox.frame, text = "Action"), rely = 0.5, 
-        relwidth = 0.1, "in" = SettingsBox.frame, anchor = "w")
     SettingsBox.action.cmd <- function(FollowThrough = TRUE) {
         temp1 <- tclvalue(tkget(SettingsBox.action.combo))
-        if (tclvalue(tkget(SettingsBox.action.combo)) != "Predict") 
+        if (tclvalue(tkget(SettingsBox.action.combo)) != "Predict") {
             Biplot.points.mode <<- tclVar("0")
-        switch(tclvalue(Biplot.Axes.var), "1" = Joint.CovarianceCorrelation.determine(), 
-            "2" = Joint.CVA.determine(), "12" = Axes.Procrustes.determine(), 
-            "13" = Axes.CircularNonLinear.determine())
+        }
+        switch(tclvalue(Biplot.Axes.var), `1` = Joint.CovarianceCorrelation.determine(), 
+            `2` = Joint.CVA.determine(), `12` = Axes.Procrustes.determine(), 
+            `13` = Axes.CircularNonLinear.determine())
         Biplot.replot()
     }
-    SettingsBox.action.combo <- tkwidget(SettingsBox.frame, "ComboBox", 
-        editable = FALSE, values = c("Predict", "Interpolate: centroid", 
-            "Interpolate: vector sum"), text = "Predict", height = 3, 
-        modifycmd = function() {
-            GUI.BindingsOff()
-            SettingsBox.action.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(SettingsBox.action.combo, relx = 0.11, rely = 0.5, 
-        relwidth = 0.35, "in" = SettingsBox.frame, anchor = "w")
-    tkplace(tklabel(SettingsBox.frame, text = "Transformation"), 
-        relx = 0.47, rely = 0.5, relwidth = 0.2, "in" = SettingsBox.frame, 
-        anchor = "w")
     SettingsBox.transformation.func <- NULL
     SettingsBox.BackTransformation.func <- NULL
     SettingsBox.transformation.cmd <- function(FollowThrough = TRUE) {
@@ -8774,7 +8696,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             else if (!is.na(WhichCol)) 
                 IN - temp1[WhichCol]
             else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
-        }, "Centre, scale" = function(IN, ARow = NA, WhichCol = NA) {
+        }, `Centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(Data[samples.in, variables.in])
             temp2 <- apply(Data[samples.in, variables.in], 2, 
                 sd)
@@ -8783,7 +8705,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             else if (!is.na(WhichCol)) 
                 (IN - temp1[WhichCol])/temp2[WhichCol]
             else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
-        }, "Unitise, centre" = function(IN, ARow = NA, WhichCol = NA) {
+        }, `Unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- apply(Data[samples.in, variables.in], 2, 
                 min)
             temp2 <- apply(Data[samples.in, variables.in], 2, 
@@ -8795,14 +8717,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             else if (!is.na(WhichCol)) 
                 (IN - temp1[WhichCol])/temp2[WhichCol] - temp3[WhichCol]
             else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
-        }, "Log, centre" = function(IN, ARow = NA, WhichCol = NA) {
+        }, `Log, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(log(Data[samples.in, variables.in]))
             if (!is.na(ARow)) 
                 log(IN) - temp1
             else if (!is.na(WhichCol)) 
                 log(IN) - temp1[WhichCol]
             else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
-        }, "Log, centre, scale" = function(IN, ARow = NA, WhichCol = NA) {
+        }, `Log, centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(log(Data[samples.in, variables.in]))
             temp2 <- apply(log(Data[samples.in, variables.in]), 
                 2, sd)
@@ -8811,7 +8733,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             else if (!is.na(WhichCol)) 
                 (log(IN) - temp1[WhichCol])/temp2[WhichCol]
             else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
-        }, "Log, unitise, centre" = function(IN, ARow = NA, WhichCol = NA) {
+        }, `Log, unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- apply(log(Data[samples.in, variables.in]), 
                 2, min)
             temp2 <- apply(log(Data[samples.in, variables.in]), 
@@ -8833,7 +8755,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 else if (!is.na(WhichCol)) 
                   IN + temp1[WhichCol]
                 else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
-            }, "Centre, scale" = function(IN, ARow = NA, WhichCol = NA) {
+            }, `Centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- colMeans(Data[samples.in, variables.in])
                 temp2 <- apply(Data[samples.in, variables.in], 
                   2, sd)
@@ -8842,7 +8764,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 else if (!is.na(WhichCol)) 
                   IN * temp2[WhichCol] + temp1[WhichCol]
                 else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
-            }, "Unitise, centre" = function(IN, ARow = NA, WhichCol = NA) {
+            }, `Unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- apply(Data[samples.in, variables.in], 
                   2, min)
                 temp2 <- apply(Data[samples.in, variables.in], 
@@ -8855,14 +8777,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   (IN + temp3[WhichCol]) * temp2[WhichCol] + 
                     temp1[WhichCol]
                 else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
-            }, "Log, centre" = function(IN, ARow = NA, WhichCol = NA) {
+            }, `Log, centre` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- colMeans(log(Data[samples.in, variables.in]))
                 if (!is.na(ARow)) 
                   exp(IN + temp1)
                 else if (!is.na(WhichCol)) 
                   exp(IN + temp1[WhichCol])
                 else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
-            }, "Log, centre, scale" = function(IN, ARow = NA, 
+            }, `Log, centre, scale` = function(IN, ARow = NA, 
                 WhichCol = NA) {
                 temp1 <- colMeans(log(Data[samples.in, variables.in]))
                 temp2 <- apply(log(Data[samples.in, variables.in]), 
@@ -8872,7 +8794,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 else if (!is.na(WhichCol)) 
                   exp(IN * temp2[WhichCol] + temp1[WhichCol])
                 else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
-            }, "Log, unitise, centre" = function(IN, ARow = NA, 
+            }, `Log, unitise, centre` = function(IN, ARow = NA, 
                 WhichCol = NA) {
                 temp1 <- apply(log(Data[samples.in, variables.in]), 
                   2, min)
@@ -8893,17 +8815,49 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             sweep(temp4, 2, sqrt(colSums(temp4^2)), "/")
         }
         Biplot.Xtransformed <<- switch(temp1, Centre = scale(Data[samples.in, 
-            variables.in], scale = FALSE), "Centre, scale" = scale(Data[samples.in, 
-            variables.in]), "Unitise, centre" = scale(apply(Data[samples.in, 
+            variables.in], scale = FALSE), `Centre, scale` = scale(Data[samples.in, 
+            variables.in]), `Unitise, centre` = scale(apply(Data[samples.in, 
             variables.in], 2, function(x) (x - min(x))/(max(x) - 
-            min(x))), scale = FALSE), "Log, centre" = scale(log(Data[samples.in, 
-            variables.in]), scale = FALSE), "Log, centre, scale" = scale(log(Data[samples.in, 
-            variables.in])), "Log, unitise, centre" = scale(apply(log(Data[samples.in, 
+            min(x))), scale = FALSE), `Log, centre` = scale(log(Data[samples.in, 
+            variables.in]), scale = FALSE), `Log, centre, scale` = scale(log(Data[samples.in, 
+            variables.in])), `Log, unitise, centre` = scale(apply(log(Data[samples.in, 
             variables.in]), 2, function(x) (x - min(x))/(max(x) - 
             min(x))), scale = FALSE))
         if (FollowThrough) 
             SettingsBox.transformation.FollowThrough.cmd()
     }
+    SettingsBox.transformation.FollowThrough.cmd <- function() {
+        tkconfigure(Other.ProgressBar.pb, value = 1/6 * 100)
+        .Tcl("update")
+        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
+            Points.skipped <<- TRUE
+            switch(tclvalue(Biplot.Axes.var), `0` = Joint.PCA.cmd(), 
+                `1` = Joint.CovarianceCorrelation.cmd(), `2` = Joint.CVA.cmd())
+        }
+        else switch(tclvalue(Points.DissimilarityMetric.var), 
+            `0` = Points.DissimilarityMetric.Pythagoras.cmd(), 
+            `1` = Points.DissimilarityMetric.SquareRootOfManhattan.cmd(), 
+            `2` = Points.DissimilarityMetric.Clark.cmd(), `3` = Points.DissimilarityMetric.Mahalanobis.cmd())
+    }
+    SettingsBox.frame <- tkframe(GUI.TopLevel, relief = "groove", 
+        borderwidth = "1.5p")
+    tkplace(SettingsBox.frame, relx = 0.61, rely = 0.6, relwidth = 0.385, 
+        relheight = 0.06, `in` = GUI.TopLevel)
+    tkplace(tklabel(SettingsBox.frame, text = "Action"), rely = 0.5, 
+        relwidth = 0.1, `in` = SettingsBox.frame, anchor = "w")
+    SettingsBox.action.combo <- tkwidget(SettingsBox.frame, "ComboBox", 
+        editable = FALSE, values = c("Predict", "Interpolate: centroid", 
+            "Interpolate: vector sum"), text = "Predict", height = 3, 
+        modifycmd = function() {
+            GUI.BindingsOff()
+            SettingsBox.action.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(SettingsBox.action.combo, relx = 0.11, rely = 0.5, 
+        relwidth = 0.35, `in` = SettingsBox.frame, anchor = "w")
+    tkplace(tklabel(SettingsBox.frame, text = "Transformation"), 
+        relx = 0.47, rely = 0.5, relwidth = 0.2, `in` = SettingsBox.frame, 
+        anchor = "w")
     SettingsBox.transformation.combo <- tkwidget(SettingsBox.frame, 
         "ComboBox", editable = FALSE, values = if (any(Data[samples.in, 
             variables.in] <= 0)) 
@@ -8919,33 +8873,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GUI.BindingsOn()
         })
     tkplace(SettingsBox.transformation.combo, relx = 0.68, rely = 0.5, 
-        relwidth = 0.3, "in" = SettingsBox.frame, anchor = "w")
-    SettingsBox.transformation.FollowThrough.cmd <- function() {
-        tkconfigure(ControlButtons.ProgressBar.pb, value = 1/6 * 
-            100)
-        .Tcl("update")
-        if (as.numeric(tclvalue(Biplot.Axes.var)) < 10) {
-            Points.skipped <<- TRUE
-            switch(tclvalue(Biplot.Axes.var), "0" = Joint.PCA.cmd(), 
-                "1" = Joint.CovarianceCorrelation.cmd(), "2" = Joint.CVA.cmd())
-        }
-        else switch(tclvalue(Points.DistanceMetric.var), "0" = Points.DistanceMetric.Pythagoras.cmd(), 
-            "1" = Points.DistanceMetric.SquareRootOfManhattan.cmd(), 
-            "2" = Points.DistanceMetric.Clark.cmd(), "3" = Points.DistanceMetric.Mahalanobis.cmd())
-    }
-    DiagnosticTabs.nb <- tk2notebook(GUI.TopLevel, tabs = NULL)
-    tkplace(DiagnosticTabs.nb, relx = 0.61, rely = 0.04, relwidth = 0.385, 
-        relheight = 0.55, "in" = GUI.TopLevel)
+        relwidth = 0.3, `in` = SettingsBox.frame, anchor = "w")
     DiagnosticTabs.xy <- NULL
     DiagnosticTabs.which <- NULL
     DiagnosticTabs.switch <- function() {
-        switch(DiagnosticTabs.which, "1" = ConvergenceTab.plot(screen = FALSE), 
-            "2" = if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
+        switch(DiagnosticTabs.which, `1` = ConvergenceTab.plot(screen = FALSE), 
+            `2` = if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
                 PointsTab.plot.predictivities(screen = FALSE)
             else if (tclvalue(Biplot.Axes.var) != "1") 
                 PointsTab.plot.ShepardDiagram(screen = FALSE), 
-            "3" = GroupsTab.plot.predictivities(screen = FALSE), 
-            "4" = AxesTab.plot.predictivities(screen = FALSE))
+            `3` = GroupsTab.plot.predictivities(screen = FALSE), 
+            `4` = AxesTab.plot.predictivities(screen = FALSE))
     }
     DiagnosticTabs.SaveAs.PDF.cmd <- function() {
         FileName <- tclvalue(tkgetSaveFile(filetypes = "{{PDF files} {.pdf}} {{All files} *}"))
@@ -9055,25 +8993,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         x11(width = 7, height = 7)
         DiagnosticTabs.switch()
     }
-    DiagnosticTabs.Convergence <- tk2frame(DiagnosticTabs.nb)
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Convergence, text = "Convergence")
-    ConvergenceTab.HorizontalScale.func <- function() as.numeric(tkwinfo("width", 
-        DiagnosticTabs.Convergence))/as.numeric(tkwinfo("fpixels", 
-        DiagnosticTabs.Convergence, "1i"))/4 * 0.99
-    ConvergenceTab.VerticalScale.func <- function() as.numeric(tkwinfo("height", 
-        DiagnosticTabs.Convergence))/as.numeric(tkwinfo("fpixels", 
-        DiagnosticTabs.Convergence, "1i"))/4 * 0.99
-    ConvergenceTab.image <- mytkrplot(DiagnosticTabs.Convergence, 
-        fun = function() {
-            par(mar = c(0, 0, 0, 0), bg = "white")
-            plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
-                xlab = "", ylab = "", bty = "n")
-        }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
-    tkplace(ConvergenceTab.image, relwidth = 1, relheight = 1, 
-        "in" = DiagnosticTabs.Convergence)
     ConvergenceTab.update <- FALSE
     ConvergenceTab.points.StressVector <- NULL
     ConvergenceTab.axes.StressVector <- NULL
+    ConvergenceTab.ShowTitle.var <- tclVar("1")
+    ConvergenceTab.ShowTitle.cmd <- function() {
+        ConvergenceTab.replot()
+    }
     ConvergenceTab.plot <- function(screen = TRUE) {
         if (!screen && Legend.yes()) {
             layout(mat = matrix(c(2, 2, 1, 1), ncol = 2, byrow = TRUE), 
@@ -9112,134 +9038,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             ConvergenceTab.image)), tclvalue(tkwinfo("pointery", 
             ConvergenceTab.image)))
     }
-    ConvergenceTab.ShowTitle.var <- tclVar("1")
-    ConvergenceTab.ShowTitle.cmd <- function() {
-        ConvergenceTab.replot()
-    }
-    ConvergenceTab.RightClick.Menu <- tk2menu(ConvergenceTab.image, 
-        tearoff = FALSE)
-    tkadd(ConvergenceTab.RightClick.Menu, "checkbutton", label = "Show title", 
-        variable = ConvergenceTab.ShowTitle.var, command = function() {
-            GUI.BindingsOff()
-            ConvergenceTab.ShowTitle.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.RightClick.Menu, "separator")
-    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.DiagnosticTabs.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.RightClick.Menu, "separator")
-    ConvergenceTab.SaveAs.menu <- tk2menu(ConvergenceTab.image, 
-        tearoff = FALSE)
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "PDF...", 
-        variable = File.SaveAs.var, value = "0", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.PDF.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
-        variable = File.SaveAs.var, value = "1", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Postscript.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
-        variable = File.SaveAs.var, value = "2", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Metafile.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
-        variable = File.SaveAs.var, value = "3", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Bmp.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Png...", 
-        variable = File.SaveAs.var, value = "4", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Png.cmd()
-            GUI.BindingsOn()
-        })
-    ConvergenceTab.SaveAs.Jpeg.menu <- tk2menu(ConvergenceTab.SaveAs.menu, 
-        tearoff = FALSE)
-    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
-        variable = File.SaveAs.var, value = "5", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 50
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
-        variable = File.SaveAs.var, value = "6", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 75
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
-        variable = File.SaveAs.var, value = "7", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 100
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.SaveAs.menu, "cascade", label = "Jpeg", 
-        menu = ConvergenceTab.SaveAs.Jpeg.menu)
-    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
-        variable = File.SaveAs.var, value = "8", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.SaveAs.PicTeX.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.RightClick.Menu, "cascade", label = "Save as", 
-        menu = ConvergenceTab.SaveAs.menu)
-    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Copy", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.Copy.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.RightClick.Menu, "separator")
-    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Print...", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.Print.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(ConvergenceTab.RightClick.Menu, "separator")
-    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "External", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "1"
-            DiagnosticTabs.ExternalWindow.cmd()
-            GUI.BindingsOn()
-        })
-    DiagnosticTabs.Points <- tk2frame(DiagnosticTabs.nb)
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Points, text = "Points")
-    PointsTab.image <- mytkrplot(DiagnosticTabs.Points, fun = function() {
-        par(mar = c(0, 0, 0, 0), bg = "white")
-        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
-            xlab = "", ylab = "", bty = "n")
-    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
-    tkplace(PointsTab.image, relwidth = 1, relheight = 1, "in" = DiagnosticTabs.Points)
     PointsTab.update <- TRUE
     PointsTab.predictivities1dim <- NULL
     PointsTab.predictivities <- NULL
+    PointsTab.ShowTitle.var <- tclVar("1")
+    PointsTab.ShowTitle.cmd <- function() {
+        PointsTab.replot()
+    }
+    PointsTab.ShowPointLabels.var <- tclVar("1")
+    PointsTab.ShowPointLabels.cmd <- function() {
+        PointsTab.replot()
+    }
     PointsTab.plot.predictivities <- function(screen = TRUE) {
         if (!screen && Legend.yes()) {
             layout(mat = matrix(c(2, 2, 1, 1), ncol = 2, byrow = TRUE), 
@@ -9316,11 +9125,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         else par(mar = c(2.5, 3, 2.5, 2))
         par(bg = "white", pty = "s")
         if (n.in <= 250) {
-            diss <- Points.DistanceMetric.DissimilarityMatrix[lower.tri(Points.DistanceMetric.DissimilarityMatrix)]
+            diss <- Points.DissimilarityMetric.DissimilarityMatrix[lower.tri(Points.DissimilarityMetric.DissimilarityMatrix)]
             dissordered <- diss[order(diss)]
-            disp <- Points.DistanceMetric.DisparityMatrix[lower.tri(Points.DistanceMetric.DisparityMatrix)][order(diss)]
+            disp <- Points.DissimilarityMetric.DisparityMatrix[lower.tri(Points.DissimilarityMetric.DisparityMatrix)][order(diss)]
             disp <- round(disp, bpar$DiagnosticTabs.ShepardDiagram.digits)
-            dist <- Points.DistanceMetric.DistanceMatrix[lower.tri(Points.DistanceMetric.DistanceMatrix)][order(diss)]
+            dist <- Points.DissimilarityMetric.DistanceMatrix[lower.tri(Points.DissimilarityMetric.DistanceMatrix)][order(diss)]
             dist <- round(dist, bpar$DiagnosticTabs.ShepardDiagram.digits)
             plot(dissordered, dist, main = "", xlab = "", ylab = "", 
                 xaxt = "n", yaxt = "n", type = "p", cex.lab = 0.85, 
@@ -9389,141 +9198,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkpopup(PointsTab.RightClick.Menu, tclvalue(tkwinfo("pointerx", 
             PointsTab.image)), tclvalue(tkwinfo("pointery", PointsTab.image)))
     }
-    PointsTab.ShowTitle.var <- tclVar("1")
-    PointsTab.ShowTitle.cmd <- function() {
-        PointsTab.replot()
-    }
-    PointsTab.ShowPointLabels.var <- tclVar("1")
-    PointsTab.ShowPointLabels.cmd <- function() {
-        PointsTab.replot()
-    }
-    PointsTab.RightClick.Menu <- tk2menu(PointsTab.image, tearoff = FALSE)
-    tkadd(PointsTab.RightClick.Menu, "checkbutton", label = "Show title", 
-        variable = PointsTab.ShowTitle.var, command = function() {
-            GUI.BindingsOff()
-            PointsTab.ShowTitle.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "checkbutton", label = "Show point labels", 
-        variable = PointsTab.ShowPointLabels.var, command = function() {
-            GUI.BindingsOff()
-            PointsTab.ShowPointLabels.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "separator")
-    tkadd(PointsTab.RightClick.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.DiagnosticTabs.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "separator")
-    PointsTab.SaveAs.menu <- tk2menu(PointsTab.image, tearoff = FALSE)
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "PDF...", 
-        variable = File.SaveAs.var, value = "0", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.PDF.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
-        variable = File.SaveAs.var, value = "1", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Postscript.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
-        variable = File.SaveAs.var, value = "2", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Metafile.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
-        variable = File.SaveAs.var, value = "3", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Bmp.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Png...", 
-        variable = File.SaveAs.var, value = "4", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Png.cmd()
-            GUI.BindingsOn()
-        })
-    PointsTab.SaveAs.Jpeg.menu <- tk2menu(PointsTab.SaveAs.menu, 
-        tearoff = FALSE)
-    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
-        variable = File.SaveAs.var, value = "5", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 50
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
-        variable = File.SaveAs.var, value = "6", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 75
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
-        variable = File.SaveAs.var, value = "7", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 100
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.SaveAs.menu, "cascade", label = "Jpeg", menu = PointsTab.SaveAs.Jpeg.menu)
-    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
-        variable = File.SaveAs.var, value = "8", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.SaveAs.PicTeX.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "cascade", label = "Save as", 
-        menu = PointsTab.SaveAs.menu)
-    tkadd(PointsTab.RightClick.Menu, "command", label = "Copy", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.Copy.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "separator")
-    tkadd(PointsTab.RightClick.Menu, "command", label = "Print...", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.Print.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(PointsTab.RightClick.Menu, "separator")
-    tkadd(PointsTab.RightClick.Menu, "command", label = "External", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "2"
-            DiagnosticTabs.ExternalWindow.cmd()
-            GUI.BindingsOn()
-        })
-    DiagnosticTabs.Groups <- tk2frame(DiagnosticTabs.nb)
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Groups, text = "Groups")
-    GroupsTab.image <- mytkrplot(DiagnosticTabs.Groups, fun = function() {
-        par(mar = c(0, 0, 0, 0), bg = "white")
-        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
-            xlab = "", ylab = "", bty = "n")
-    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
-    tkplace(GroupsTab.image, relwidth = 1, relheight = 1, "in" = DiagnosticTabs.Groups)
     GroupsTab.update <- FALSE
     GroupsTab.predictivities1dim <- NULL
     GroupsTab.predictivities <- NULL
+    GroupsTab.ShowTitle.var <- tclVar("1")
+    GroupsTab.ShowTitle.cmd <- function() {
+        GroupsTab.replot()
+    }
+    GroupsTab.ShowGroupLabels.var <- tclVar("1")
+    GroupsTab.ShowGroupLabels.cmd <- function() {
+        GroupsTab.replot()
+    }
     GroupsTab.plot.predictivities <- function(screen = TRUE) {
         if (!screen && Legend.yes()) {
             layout(mat = matrix(c(2, 2, 1, 1), ncol = 2, byrow = TRUE), 
@@ -9591,141 +9276,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkpopup(GroupsTab.RightClick.Menu, tclvalue(tkwinfo("pointerx", 
             GroupsTab.image)), tclvalue(tkwinfo("pointery", GroupsTab.image)))
     }
-    GroupsTab.ShowTitle.var <- tclVar("1")
-    GroupsTab.ShowTitle.cmd <- function() {
-        GroupsTab.replot()
-    }
-    GroupsTab.ShowGroupLabels.var <- tclVar("1")
-    GroupsTab.ShowGroupLabels.cmd <- function() {
-        GroupsTab.replot()
-    }
-    GroupsTab.RightClick.Menu <- tk2menu(GroupsTab.image, tearoff = FALSE)
-    tkadd(GroupsTab.RightClick.Menu, "checkbutton", label = "Show title", 
-        variable = GroupsTab.ShowTitle.var, command = function() {
-            GUI.BindingsOff()
-            GroupsTab.ShowTitle.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "checkbutton", label = "Show group labels", 
-        variable = GroupsTab.ShowGroupLabels.var, command = function() {
-            GUI.BindingsOff()
-            GroupsTab.ShowGroupLabels.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "separator")
-    tkadd(GroupsTab.RightClick.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.DiagnosticTabs.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "separator")
-    GroupsTab.SaveAs.menu <- tk2menu(GroupsTab.image, tearoff = FALSE)
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "PDF...", 
-        variable = File.SaveAs.var, value = "0", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.PDF.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
-        variable = File.SaveAs.var, value = "1", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Postscript.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
-        variable = File.SaveAs.var, value = "2", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Metafile.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
-        variable = File.SaveAs.var, value = "3", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Bmp.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Png...", 
-        variable = File.SaveAs.var, value = "4", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Png.cmd()
-            GUI.BindingsOn()
-        })
-    GroupsTab.SaveAs.Jpeg.menu <- tk2menu(GroupsTab.SaveAs.menu, 
-        tearoff = FALSE)
-    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
-        variable = File.SaveAs.var, value = "5", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 50
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
-        variable = File.SaveAs.var, value = "6", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 75
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
-        variable = File.SaveAs.var, value = "7", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 100
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.SaveAs.menu, "cascade", label = "Jpeg", menu = GroupsTab.SaveAs.Jpeg.menu)
-    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
-        variable = File.SaveAs.var, value = "8", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.SaveAs.PicTeX.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "cascade", label = "Save as", 
-        menu = GroupsTab.SaveAs.menu)
-    tkadd(GroupsTab.RightClick.Menu, "command", label = "Copy", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.Copy.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "separator")
-    tkadd(GroupsTab.RightClick.Menu, "command", label = "Print...", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.Print.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(GroupsTab.RightClick.Menu, "separator")
-    tkadd(GroupsTab.RightClick.Menu, "command", label = "External", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "3"
-            DiagnosticTabs.ExternalWindow.cmd()
-            GUI.BindingsOn()
-        })
-    DiagnosticTabs.Axes <- tk2frame(DiagnosticTabs.nb)
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Axes, text = "Axes")
-    AxesTab.image <- mytkrplot(DiagnosticTabs.Axes, fun = function() {
-        par(mar = c(0, 0, 0, 0), bg = "white")
-        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
-            xlab = "", ylab = "", bty = "n")
-    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
-    tkplace(AxesTab.image, relwidth = 1, relheight = 1, "in" = DiagnosticTabs.Axes)
     AxesTab.update <- TRUE
     AxesTab.predictivities1dim <- NULL
     AxesTab.predictivities <- NULL
+    AxesTab.ShowTitle.var <- tclVar("1")
+    AxesTab.ShowTitle.cmd <- function() {
+        AxesTab.replot()
+    }
+    AxesTab.ShowAxisLabels.var <- tclVar("1")
+    AxesTab.ShowAxisLabels.cmd <- function() {
+        AxesTab.replot()
+    }
     AxesTab.plot.predictivities <- function(screen = TRUE) {
         if (!screen && Legend.yes()) {
             layout(mat = matrix(c(2, 2, 1, 1), ncol = 2, byrow = TRUE), 
@@ -9833,245 +9394,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkpopup(AxesTab.RightClick.Menu, tclvalue(tkwinfo("pointerx", 
             AxesTab.image)), tclvalue(tkwinfo("pointery", AxesTab.image)))
     }
-    AxesTab.ShowTitle.var <- tclVar("1")
-    AxesTab.ShowTitle.cmd <- function() {
-        AxesTab.replot()
-    }
-    AxesTab.ShowAxisLabels.var <- tclVar("1")
-    AxesTab.ShowAxisLabels.cmd <- function() {
-        AxesTab.replot()
-    }
-    AxesTab.RightClick.Menu <- tk2menu(AxesTab.image, tearoff = FALSE)
-    tkadd(AxesTab.RightClick.Menu, "checkbutton", label = "Show title", 
-        variable = AxesTab.ShowTitle.var, command = function() {
-            GUI.BindingsOff()
-            AxesTab.ShowTitle.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "checkbutton", label = "Show axis labels", 
-        variable = AxesTab.ShowAxisLabels.var, command = function() {
-            GUI.BindingsOff()
-            AxesTab.ShowAxisLabels.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "separator")
-    tkadd(AxesTab.RightClick.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.DiagnosticTabs.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "separator")
-    AxesTab.SaveAs.menu <- tk2menu(AxesTab.image, tearoff = FALSE)
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "PDF...", 
-        variable = File.SaveAs.var, value = "0", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.PDF.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
-        variable = File.SaveAs.var, value = "1", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Postscript.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
-        variable = File.SaveAs.var, value = "2", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Metafile.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
-        variable = File.SaveAs.var, value = "3", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Bmp.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Png...", 
-        variable = File.SaveAs.var, value = "4", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Png.cmd()
-            GUI.BindingsOn()
-        })
-    AxesTab.SaveAs.Jpeg.menu <- tk2menu(AxesTab.SaveAs.menu, 
-        tearoff = FALSE)
-    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
-        variable = File.SaveAs.var, value = "5", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 50
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
-        variable = File.SaveAs.var, value = "6", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 75
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
-        variable = File.SaveAs.var, value = "7", command = function() {
-            GUI.BindingsOff()
-            File.Jpeg.quality <<- 100
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.Jpeg.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.SaveAs.menu, "cascade", label = "Jpeg", menu = AxesTab.SaveAs.Jpeg.menu)
-    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
-        variable = File.SaveAs.var, value = "8", command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.SaveAs.PicTeX.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "cascade", label = "Save as", 
-        menu = AxesTab.SaveAs.menu)
-    tkadd(AxesTab.RightClick.Menu, "command", label = "Copy", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.Copy.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "separator")
-    tkadd(AxesTab.RightClick.Menu, "command", label = "Print...", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.Print.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(AxesTab.RightClick.Menu, "separator")
-    tkadd(AxesTab.RightClick.Menu, "command", label = "External", 
-        command = function() {
-            GUI.BindingsOff()
-            DiagnosticTabs.which <<- "4"
-            DiagnosticTabs.ExternalWindow.cmd()
-            GUI.BindingsOn()
-        })
-    DiagnosticTabs.Predictions <- tk2frame(DiagnosticTabs.nb)
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Predictions, text = "Predictions")
-    PredictionsTab.arrayR <- NULL
-    PredictionsTab.arrayTcl <- NULL
-    PredictionsTab.ColumnsUsed <- NULL
-    PredictionsTab.table <- NULL
-    PredictionsTab.yscr <- NULL
-    PredictionsTab.InitialSetup <- TRUE
-    PredictionsTab.place <- function() {
-        tkplace(PredictionsTab.table, relx = 0.5, rely = 0.1, 
-            height = 290, "in" = DiagnosticTabs.Predictions, 
-            anchor = "n")
-        b <- as.numeric(tclvalue(tkwinfo("width", PredictionsTab.table)))
-        a <- as.numeric(tclvalue(tkwinfo("width", DiagnosticTabs.Convergence)))
-        c <- a/2 + b/2
-        tkplace(PredictionsTab.yscr, x = c - 1, rely = 0.1, height = 290, 
-            "in" = DiagnosticTabs.Predictions, anchor = "nw")
-    }
-    PredictionsTab.ArraySetup <- function() {
-        PredictionsTab.arrayR <<- c("Variable", bpar$axes.label.text[variables.in], 
-            "Predicted", rep(" ", p.in), "Actual", rep(" ", p.in), 
-            "RelAbsErr%", rep(" ", p.in))
-        dim(PredictionsTab.arrayR) <<- c(p.in + 1, 4)
-        if (PredictionsTab.InitialSetup) 
-            PredictionsTab.arrayTcl <<- tclArray()
-        else {
-            .Tcl(paste("unset ", PredictionsTab.arrayTcl, sep = ""))
-            PredictionsTab.arrayTcl <<- tclArray()
-        }
-        for (j in 0:3) PredictionsTab.arrayTcl[[0, j]] <<- PredictionsTab.arrayR[1, 
-            j + 1]
-        for (i in (1:p.in)) PredictionsTab.arrayTcl[[i, 0]] <<- PredictionsTab.arrayR[i + 
-            1, 1]
-        PredictionsTab.ColumnsUsed <<- 0
-        if (PredictionsTab.InitialSetup) {
-            PredictionsTab.table <<- tk2table(DiagnosticTabs.Predictions, 
-                variable = PredictionsTab.arrayTcl, rows = max(17, 
-                  p + 1), cols = 4, titlerows = 1, resizeborders = "none", 
-                selectmode = "browse", rowseparator = "\"\n\"", 
-                colseparator = "\"\t\"", padx = 5, background = "white", 
-                state = "disabled", yscrollcommand = function(...) tkset(PredictionsTab.yscr, 
-                  ...))
-            PredictionsTab.yscr <<- tkscrollbar(DiagnosticTabs.Predictions, 
-                command = function(...) tkyview(PredictionsTab.table, 
-                  ...))
-            PredictionsTab.InitialSetup <<- FALSE
-        }
-        else tkconfigure(PredictionsTab.table, variable = PredictionsTab.arrayTcl)
-        if (Biplot.axes.mode == 0) {
-            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
-                " tag cell Cell", temp1, ".0 ", temp1, ",0", 
-                sep = ""))
-            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
-                " tag configure Cell", temp1, ".0", " -fg ", 
-                bpar$axes.label.col[variables.in[temp1]], sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col VariableNames 0", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 1", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 2", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 3", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure title -anchor c", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure VariableNames -anchor w", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure NumericalOutput -anchor e", 
-                sep = ""))
-        }
-        else {
-            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
-                " tag cell Cell", temp1, ".0 ", temp1, ",0", 
-                sep = ""))
-            for (temp1 in which(variables.in != Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
-                " tag configure Cell", temp1, ".0", " -fg ", 
-                bpar$interaction.highlight.axes.col.bg, sep = ""))
-            temp1 <- which(variables.in == Biplot.axes.WhichHighlight)
-            .Tcl(paste(PredictionsTab.table, " tag configure Cell", 
-                temp1, ".0", " -fg ", bpar$interaction.highlight.axes.col.fg, 
-                sep = ""))
-            for (temp1 in 1:3) .Tcl(paste(PredictionsTab.table, 
-                " tag cell Cell", which(variables.in == Biplot.axes.WhichHighlight), 
-                ".", temp1, " ", which(variables.in == Biplot.axes.WhichHighlight), 
-                ",", temp1, sep = ""))
-            for (temp1 in 1:3) .Tcl(paste(PredictionsTab.table, 
-                " tag configure Cell", which(variables.in == 
-                  Biplot.axes.WhichHighlight), ".", temp1, " -fg black", 
-                sep = ""))
-            for (temp1 in 1:3) for (temp2 in which(variables.in != 
-                Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
-                " tag cell Cell", temp2, ".", temp1, " ", temp2, 
-                ",", temp1, sep = ""))
-            for (temp1 in 1:3) for (temp2 in which(variables.in != 
-                Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
-                " tag configure Cell", temp2, ".", temp1, " -fg ", 
-                bpar$interaction.highlight.axes.col.bg, sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col VariableNames 0", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 1", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 2", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 3", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure title -anchor c", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure VariableNames -anchor w", 
-                sep = ""))
-            .Tcl(paste(PredictionsTab.table, " tag configure NumericalOutput -anchor e", 
-                sep = ""))
-        }
-        PredictionsTab.place()
-    }
-    PredictionsTab.ArraySetup()
     PredictionsTab.update <- function() {
         if (tclvalue(Biplot.points.mode) == "1") {
             PredictionsTab.arrayR <<- c("Variable", bpar$axes.label.text[variables.in], 
@@ -10102,33 +9424,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         tkconfigure(PredictionsTab.table, variable = PredictionsTab.arrayTcl)
     }
-    DiagnosticTabs.Export <- tk2frame(DiagnosticTabs.nb)
-    ExportTab.frame <- tk2frame(DiagnosticTabs.Export, relief = "groove", 
-        borderwidth = "1.5p")
-    tkplace(ExportTab.frame, "in" = DiagnosticTabs.Export, relx = 0.525, 
-        rely = 0.475, relwidth = 0.755, relheight = 0.75, anchor = "center")
-    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Export, text = "Export")
-    ExportTab.scrx <- tkscrollbar(ExportTab.frame, repeatinterval = 5, 
-        command = function(...) tkxview(ExportTab.tree, ...), 
-        orient = "horizontal")
-    ExportTab.scry <- tkscrollbar(ExportTab.frame, repeatinterval = 5, 
-        command = function(...) tkyview(ExportTab.tree, ...))
-    ExportTab.tree <- tkwidget(ExportTab.frame, "Tree", relief = "flat", 
-        dropenabled = "0", dragenabled = "0", bg = "white", padx = 4, 
-        xscrollcommand = function(...) tkset(ExportTab.scrx, 
-            ...), yscrollcommand = function(...) tkset(ExportTab.scry, 
-            ...))
-    tkplace(ExportTab.tree, relx = 0, rely = 0, relwidth = 0.945, 
-        relheight = 0.945, "in" = ExportTab.frame, anchor = "nw")
-    tkplace(ExportTab.scrx, relx = 0, rely = 1, relwidth = 0.95, 
-        "in" = ExportTab.frame, anchor = "sw")
-    tkplace(ExportTab.scry, relx = 1, rely = 0, relheight = 0.95, 
-        "in" = ExportTab.frame, anchor = "ne")
-    ExportTab.data <- NULL
-    ExportTab.data.name <- NULL
-    ExportTab.data.func <- NULL
-    ExportTab.Rvalue <- NULL
-    ExportTab.Nvalue <- NULL
     ExportTab.update <- function() {
         if (length(ExportTab.data) > 0) 
             for (i in 1:length(ExportTab.data)) tcl(ExportTab.tree, 
@@ -10165,7 +9460,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "Predict") 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                  "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")
+                  "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("PCA.Vr", 
                 "PCA.Y", "PCA.Delta", "PCA.eigen", "PCA.quality", 
                 "PCA.PointPredictivities", "PCA.AxisPredictivities", 
@@ -10173,7 +9468,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data.name[[length(ExportTab.data.name)]] <<- c(ExportTab.data.name[[length(ExportTab.data.name)]], 
-                  "PCA.Pred", "PCA.RelMeanAbsErr")
+                  "PCA.Pred", "PCA.MeanRelAbsErr")
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Biplot.B_
                 rownames(temp1) <- AxisLabels[variables.in]
@@ -10247,21 +9542,21 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   })
         }
         if (tclvalue(Biplot.Axes.var) == "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Covariance/Correlation" = c("Vr, the matrix of basis vectors", 
+            ExportTab.data <<- c(ExportTab.data, list(`Covariance/Correlation` = c("Vr, the matrix of basis vectors", 
                 "Y, the matrix of point coordinates", "CovCor, the matrix of covariances/correlations", 
                 "eigen, the vector of eigenvalues", "quality, the quality of the display")))
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                  "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")
+                  "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("CovarianceCorrelation.Vr", 
                 "CovarianceCorrelation.Y", "CovarianceCorrelation.CovCor", 
                 "CovarianceCorrelation.eigen", "CovarianceCorrelation.quality")))
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data.name[[length(ExportTab.data.name)]] <<- c(ExportTab.data.name[[length(ExportTab.data.name)]], 
-                  "CovarianceCorrelation.Pred", "CovarianceCorrelation.RelMeanAbsErr")
+                  "CovarianceCorrelation.Pred", "CovarianceCorrelation.MeanRelAbsErr")
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Biplot.B_
                 rownames(temp1) <- AxisLabels[variables.in]
@@ -10318,7 +9613,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   })
         }
         if (tclvalue(Biplot.Axes.var) == "2") {
-            ExportTab.data <<- c(ExportTab.data, list(CVA = c("Xbar, the matrix of sample group means", 
+            ExportTab.data <<- c(ExportTab.data, list(CVA = c("XtrBar, the matrix of sample group means", 
                 "B, the matrix of between-groups sums-of-squares-and-crossproducts", 
                 "W, the matrix of within-groups sums-of-squares-and-crossproducts", 
                 "N, the matrix of group sizes", "Vr, the matrix of axis basis vectors", 
@@ -10330,7 +9625,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "Predict") 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                  "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")
+                  "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("CVA.Xbar", 
                 "CVA.B", "CVA.W", "CVA.N", "CVA.Vr", "CVA.Y", 
                 "CVA.Delta", "CVA.PointPredictivities", "CVA.GroupPredictivities", 
@@ -10338,7 +9633,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data.name[[length(ExportTab.data.name)]] <<- c(ExportTab.data.name[[length(ExportTab.data.name)]], 
-                  "CVA.Pred", "CVA.RelMeanAbsErr")
+                  "CVA.Pred", "CVA.MeanRelAbsErr")
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- apply(Biplot.Xtransformed, 2, function(x) tapply(x, 
                   factor(group[samples.in], exclude = NULL), 
@@ -10448,7 +9743,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "PCO.B", "PCO.Y", "PCO.Delta", "PCO.eigenB", 
                 "PCO.quality")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
-                temp1 <- Points.DistanceMetric.DissimilarityMatrix
+                temp1 <- Points.DissimilarityMetric.DissimilarityMatrix
                 rownames(temp1) <- PointLabels[samples.in]
                 colnames(temp1) <- PointLabels[samples.in]
                 temp1
@@ -10456,7 +9751,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 temp1 <- matrix(0, nrow = n.in, ncol = n.in)
                 temp1[cbind(1:n.in, 1:n.in)] <- 1
                 temp1 <- temp1 - 1/n.in
-                temp2 <- -0.5 * temp1 %*% (Points.DistanceMetric.DissimilarityMatrix^2) %*% 
+                temp2 <- -0.5 * temp1 %*% (Points.DissimilarityMetric.DissimilarityMatrix^2) %*% 
                   temp1
                 rownames(temp2) <- PointLabels[samples.in]
                 colnames(temp2) <- PointLabels[samples.in]
@@ -10475,7 +9770,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 temp1 <- matrix(0, nrow = n.in, ncol = n.in)
                 temp1[cbind(1:n.in, 1:n.in)] <- 1
                 temp1 <- temp1 - 1/n.in
-                temp2 <- -0.5 * temp1 %*% (Points.DistanceMetric.DissimilarityMatrix^2) %*% 
+                temp2 <- -0.5 * temp1 %*% (Points.DissimilarityMetric.DissimilarityMatrix^2) %*% 
                   temp1
                 temp3 <- eigen(temp2, symmetric = TRUE)$values
                 names(temp3) <- paste("Dimension", 1:length(temp3))
@@ -10484,7 +9779,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 temp1 <- matrix(0, nrow = n.in, ncol = n.in)
                 temp1[cbind(1:n.in, 1:n.in)] <- 1
                 temp1 <- temp1 - 1/n.in
-                temp2 <- -0.5 * temp1 %*% (Points.DistanceMetric.DissimilarityMatrix^2) %*% 
+                temp2 <- -0.5 * temp1 %*% (Points.DissimilarityMetric.DissimilarityMatrix^2) %*% 
                   temp1
                 sum((temp3 <- eigen(temp2, symmetric = TRUE)$values)[1:2])/sum(temp3)
             })))
@@ -10498,7 +9793,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("MDS.D", 
                 "MDS.Y", "MDS.Delta", "MDS.Y0", "MDS.stress")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
-                temp1 <- Points.DistanceMetric.DissimilarityMatrix
+                temp1 <- Points.DissimilarityMetric.DissimilarityMatrix
                 rownames(temp1) <- PointLabels[samples.in]
                 colnames(temp1) <- PointLabels[samples.in]
                 temp1
@@ -10529,12 +9824,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("MDS.D", 
                 "MDS.Dhat", "MDS.Y", "MDS.Delta", "MDS.Y0", "MDS.stress")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
-                temp1 <- Points.DistanceMetric.DissimilarityMatrix
+                temp1 <- Points.DissimilarityMetric.DissimilarityMatrix
                 rownames(temp1) <- PointLabels[samples.in]
                 colnames(temp1) <- PointLabels[samples.in]
                 temp1
             }, function() {
-                temp1 <- Points.DistanceMetric.DisparityMatrix
+                temp1 <- Points.DissimilarityMetric.DisparityMatrix
                 rownames(temp1) <- PointLabels[samples.in]
                 colnames(temp1) <- PointLabels[samples.in]
                 temp1
@@ -10561,12 +9856,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 "Predict") 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                  "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")
+                  "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("Regression.B")))
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data.name[[length(ExportTab.data.name)]] <<- c(ExportTab.data.name[[length(ExportTab.data.name)]], 
-                  "Regression.Pred", "Regression.RelMeanAbsErr")
+                  "Regression.Pred", "Regression.MeanRelAbsErr")
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Biplot.B
                 rownames(temp1) <- AxisLabels[variables.in]
@@ -10610,9 +9905,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             "Predict") {
             ExportTab.data <<- c(ExportTab.data, list(Procrustes = c("Q, the orthogonal Procrustes matrix", 
                 "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")))
+                "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("Procrustes.Q", 
-                "Procrustes.Pred", "Procrustes.RelMeanAbsErr")))
+                "Procrustes.Pred", "Procrustes.MeanRelAbsErr")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Biplot.B
                 rownames(temp1) <- AxisLabels[variables.in]
@@ -10660,17 +9955,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })))
         }
         if (tclvalue(Biplot.Axes.var) == "13") {
-            ExportTab.data <<- c(ExportTab.data, list("Circular non-linear" = c("Axis, the list of axis coordinates and marker labels")))
+            ExportTab.data <<- c(ExportTab.data, list(`Circular non-linear` = c("Axis, the list of axis coordinates and marker labels")))
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Pred, the list of predictions, actual values and percentage relative absolute errors", 
-                  "RelMeanAbsErr, the vector of axis percentage relative mean absolute errors")
+                  "MeanRelAbsErr, the vector of axis percentage mean relative absolute errors")
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("CircularNonLinear.Axis")))
             if (tclvalue(tkget(SettingsBox.action.combo)) == 
                 "Predict") 
                 ExportTab.data.name[[length(ExportTab.data.name)]] <<- c(ExportTab.data.name[[length(ExportTab.data.name)]], 
-                  "CircularNonLinear.Pred", "CircularNonLinear.RelMeanAbsErr")
+                  "CircularNonLinear.Pred", "CircularNonLinear.MeanRelAbsErr")
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Biplot.axis
                 names(temp1) <- AxisLabels[variables.in]
@@ -10706,7 +10001,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         if (tclvalue(Additional.Interpolate.ANewSample.var) == 
             "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Interpolate: A new sample" = c("Coord, the vector of coordinates")))
+            ExportTab.data <<- c(ExportTab.data, list(`Interpolate: A new sample` = c("Coord, the vector of coordinates")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("InterpolateANewSample.Coord")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Additional.Interpolate.ANewSample.coordinates
@@ -10716,7 +10011,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
             "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Interpolate: Sample group means" = c("Coord, the matrix of coordinates")))
+            ExportTab.data <<- c(ExportTab.data, list(`Interpolate: Sample group means` = c("Coord, the matrix of coordinates")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("InterpolateSampleGroupMeans.Coord")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Additional.Interpolate.SampleGroupMeans.coordinates
@@ -10726,12 +10021,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })))
         }
         if (tclvalue(Additional.ConvexHull.var) == "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Convex hulls" = c("Coord, the list of coordinates")))
+            ExportTab.data <<- c(ExportTab.data, list(`Convex hulls` = c("Coord, the list of coordinates")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("ConvexHulls.Coord")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Additional.ConvexHullAlphaBag.coordinates
                 names(temp1) <- switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                  "-1" = "All points", "0" = bpar$groups.label.text[groups.in], 
+                  `-1` = "All points", `0` = bpar$groups.label.text[groups.in], 
                   bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])
                 for (i in 1:length(temp1)) colnames(temp1[[i]]) <- paste("Dimension", 
                   1:2)
@@ -10739,7 +10034,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             })))
         }
         if (tclvalue(Additional.AlphaBag.var) == "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Alpha-bags" = c("Coord, the list of coordinates")))
+            ExportTab.data <<- c(ExportTab.data, list(`Alpha-bags` = c("Coord, the list of coordinates")))
             if (Additional.ConvexHullAlphaBag.ShowTukeyMedian) 
                 ExportTab.data[[length(ExportTab.data)]] <<- c(ExportTab.data[[length(ExportTab.data)]], 
                   "Tukey, the list of coordinates")
@@ -10750,7 +10045,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 temp1 <- Additional.ConvexHullAlphaBag.coordinates
                 names(temp1) <- switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                  "-1" = "All points", "0" = bpar$groups.label.text[groups.in], 
+                  `-1` = "All points", `0` = bpar$groups.label.text[groups.in], 
                   bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])
                 for (i in 1:length(temp1)) colnames(temp1[[i]]) <- paste("Dimension", 
                   1:2)
@@ -10766,7 +10061,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   })
         }
         if (tclvalue(Additional.PointDensities.var) == "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Point densitities" = c("Dens, the list of point densities")))
+            ExportTab.data <<- c(ExportTab.data, list(`Point densitities` = c("Dens, the list of point densities")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("PointDensities.Dens")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 Additional.PointDensities.estimate
@@ -10774,7 +10069,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         if (tclvalue(Additional.ClassificationRegion.var) == 
             "1") {
-            ExportTab.data <<- c(ExportTab.data, list("Classification regions" = c("Class, the list of classification regions")))
+            ExportTab.data <<- c(ExportTab.data, list(`Classification regions` = c("Class, the list of classification regions")))
             ExportTab.data.name <<- c(ExportTab.data.name, list(c("ClassificationRegions.Class")))
             ExportTab.data.func <<- c(ExportTab.data.func, list(c(function() {
                 xseq <- seq(Biplot.par$usr[1], Biplot.par$usr[2], 
@@ -10836,15 +10131,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         print(ExportTab.data.func[[ExportTab.Rvalue]][[ExportTab.Nvalue]]())
         cat("\n")
     }
-    ExportTab.DisplayInConsole.but <- tk2button(DiagnosticTabs.Export, 
-        text = "Display in console", command = function() {
-            GUI.BindingsOff()
-            ExportTab.DisplayInConsole.cmd()
-            GUI.BindingsOn()
-        })
-    tkplace(ExportTab.DisplayInConsole.but, relx = 0.24, rely = 0.92, 
-        relwidth = 0.28, height = 22, "in" = DiagnosticTabs.Export, 
-        anchor = "w")
     ExportTab.ExportToWorkspace.cmd <- function() {
         assign(ExportTab.data.name[[ExportTab.Rvalue]][ExportTab.Nvalue], 
             ExportTab.data.func[[ExportTab.Rvalue]][[ExportTab.Nvalue]](), 
@@ -10853,6 +10139,679 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             "' in the Workspace as `", ExportTab.data.name[[ExportTab.Rvalue]][ExportTab.Nvalue], 
             "'.\n\n", sep = "")
     }
+    DiagnosticTabs.nb <- tk2notebook(GUI.TopLevel, tabs = NULL)
+    tkplace(DiagnosticTabs.nb, relx = 0.61, rely = 0.04, relwidth = 0.385, 
+        relheight = 0.55, `in` = GUI.TopLevel)
+    DiagnosticTabs.Convergence <- tk2frame(DiagnosticTabs.nb)
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Convergence, text = "Convergence")
+    ConvergenceTab.HorizontalScale.func <- function() as.numeric(tkwinfo("width", 
+        DiagnosticTabs.Convergence))/as.numeric(tkwinfo("fpixels", 
+        DiagnosticTabs.Convergence, "1i"))/4 * 0.99
+    ConvergenceTab.VerticalScale.func <- function() as.numeric(tkwinfo("height", 
+        DiagnosticTabs.Convergence))/as.numeric(tkwinfo("fpixels", 
+        DiagnosticTabs.Convergence, "1i"))/4 * 0.99
+    ConvergenceTab.image <- mytkrplot(DiagnosticTabs.Convergence, 
+        fun = function() {
+            par(mar = c(0, 0, 0, 0), bg = "white")
+            plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
+                xlab = "", ylab = "", bty = "n")
+        }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
+    tkplace(ConvergenceTab.image, relwidth = 1, relheight = 1, 
+        `in` = DiagnosticTabs.Convergence)
+    ConvergenceTab.RightClick.Menu <- tk2menu(ConvergenceTab.image, 
+        tearoff = FALSE)
+    tkadd(ConvergenceTab.RightClick.Menu, "checkbutton", label = "Show title", 
+        variable = ConvergenceTab.ShowTitle.var, command = function() {
+            GUI.BindingsOff()
+            ConvergenceTab.ShowTitle.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.RightClick.Menu, "separator")
+    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.DiagnosticTabs.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.RightClick.Menu, "separator")
+    ConvergenceTab.SaveAs.menu <- tk2menu(ConvergenceTab.image, 
+        tearoff = FALSE)
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "PDF...", 
+        variable = File.SaveAs.var, value = "0", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.PDF.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
+        variable = File.SaveAs.var, value = "1", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Postscript.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
+        variable = File.SaveAs.var, value = "2", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Metafile.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
+        variable = File.SaveAs.var, value = "3", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Bmp.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "Png...", 
+        variable = File.SaveAs.var, value = "4", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Png.cmd()
+            GUI.BindingsOn()
+        })
+    ConvergenceTab.SaveAs.Jpeg.menu <- tk2menu(ConvergenceTab.SaveAs.menu, 
+        tearoff = FALSE)
+    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
+        variable = File.SaveAs.var, value = "5", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 50
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
+        variable = File.SaveAs.var, value = "6", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 75
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
+        variable = File.SaveAs.var, value = "7", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 100
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.SaveAs.menu, "cascade", label = "Jpeg", 
+        menu = ConvergenceTab.SaveAs.Jpeg.menu)
+    tkadd(ConvergenceTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
+        variable = File.SaveAs.var, value = "8", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.SaveAs.PicTeX.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.RightClick.Menu, "cascade", label = "Save as", 
+        menu = ConvergenceTab.SaveAs.menu)
+    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Copy", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.Copy.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.RightClick.Menu, "separator")
+    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "Print...", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.Print.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(ConvergenceTab.RightClick.Menu, "separator")
+    tkadd(ConvergenceTab.RightClick.Menu, "command", label = "External", 
+        command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "1"
+            DiagnosticTabs.ExternalWindow.cmd()
+            GUI.BindingsOn()
+        })
+    DiagnosticTabs.Points <- tk2frame(DiagnosticTabs.nb)
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Points, text = "Points")
+    PointsTab.image <- mytkrplot(DiagnosticTabs.Points, fun = function() {
+        par(mar = c(0, 0, 0, 0), bg = "white")
+        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
+            xlab = "", ylab = "", bty = "n")
+    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
+    tkplace(PointsTab.image, relwidth = 1, relheight = 1, `in` = DiagnosticTabs.Points)
+    PointsTab.RightClick.Menu <- tk2menu(PointsTab.image, tearoff = FALSE)
+    tkadd(PointsTab.RightClick.Menu, "checkbutton", label = "Show title", 
+        variable = PointsTab.ShowTitle.var, command = function() {
+            GUI.BindingsOff()
+            PointsTab.ShowTitle.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "checkbutton", label = "Show point labels", 
+        variable = PointsTab.ShowPointLabels.var, command = function() {
+            GUI.BindingsOff()
+            PointsTab.ShowPointLabels.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "separator")
+    tkadd(PointsTab.RightClick.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.DiagnosticTabs.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "separator")
+    PointsTab.SaveAs.menu <- tk2menu(PointsTab.image, tearoff = FALSE)
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "PDF...", 
+        variable = File.SaveAs.var, value = "0", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.PDF.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
+        variable = File.SaveAs.var, value = "1", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Postscript.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
+        variable = File.SaveAs.var, value = "2", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Metafile.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
+        variable = File.SaveAs.var, value = "3", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Bmp.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "Png...", 
+        variable = File.SaveAs.var, value = "4", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Png.cmd()
+            GUI.BindingsOn()
+        })
+    PointsTab.SaveAs.Jpeg.menu <- tk2menu(PointsTab.SaveAs.menu, 
+        tearoff = FALSE)
+    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
+        variable = File.SaveAs.var, value = "5", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 50
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
+        variable = File.SaveAs.var, value = "6", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 75
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
+        variable = File.SaveAs.var, value = "7", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 100
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.SaveAs.menu, "cascade", label = "Jpeg", menu = PointsTab.SaveAs.Jpeg.menu)
+    tkadd(PointsTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
+        variable = File.SaveAs.var, value = "8", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.SaveAs.PicTeX.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "cascade", label = "Save as", 
+        menu = PointsTab.SaveAs.menu)
+    tkadd(PointsTab.RightClick.Menu, "command", label = "Copy", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.Copy.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "separator")
+    tkadd(PointsTab.RightClick.Menu, "command", label = "Print...", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.Print.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(PointsTab.RightClick.Menu, "separator")
+    tkadd(PointsTab.RightClick.Menu, "command", label = "External", 
+        command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "2"
+            DiagnosticTabs.ExternalWindow.cmd()
+            GUI.BindingsOn()
+        })
+    DiagnosticTabs.Groups <- tk2frame(DiagnosticTabs.nb)
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Groups, text = "Groups")
+    GroupsTab.image <- mytkrplot(DiagnosticTabs.Groups, fun = function() {
+        par(mar = c(0, 0, 0, 0), bg = "white")
+        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
+            xlab = "", ylab = "", bty = "n")
+    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
+    tkplace(GroupsTab.image, relwidth = 1, relheight = 1, `in` = DiagnosticTabs.Groups)
+    GroupsTab.RightClick.Menu <- tk2menu(GroupsTab.image, tearoff = FALSE)
+    tkadd(GroupsTab.RightClick.Menu, "checkbutton", label = "Show title", 
+        variable = GroupsTab.ShowTitle.var, command = function() {
+            GUI.BindingsOff()
+            GroupsTab.ShowTitle.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "checkbutton", label = "Show group labels", 
+        variable = GroupsTab.ShowGroupLabels.var, command = function() {
+            GUI.BindingsOff()
+            GroupsTab.ShowGroupLabels.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "separator")
+    tkadd(GroupsTab.RightClick.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.DiagnosticTabs.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "separator")
+    GroupsTab.SaveAs.menu <- tk2menu(GroupsTab.image, tearoff = FALSE)
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "PDF...", 
+        variable = File.SaveAs.var, value = "0", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.PDF.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
+        variable = File.SaveAs.var, value = "1", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Postscript.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
+        variable = File.SaveAs.var, value = "2", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Metafile.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
+        variable = File.SaveAs.var, value = "3", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Bmp.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "Png...", 
+        variable = File.SaveAs.var, value = "4", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Png.cmd()
+            GUI.BindingsOn()
+        })
+    GroupsTab.SaveAs.Jpeg.menu <- tk2menu(GroupsTab.SaveAs.menu, 
+        tearoff = FALSE)
+    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
+        variable = File.SaveAs.var, value = "5", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 50
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
+        variable = File.SaveAs.var, value = "6", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 75
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
+        variable = File.SaveAs.var, value = "7", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 100
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.SaveAs.menu, "cascade", label = "Jpeg", menu = GroupsTab.SaveAs.Jpeg.menu)
+    tkadd(GroupsTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
+        variable = File.SaveAs.var, value = "8", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.SaveAs.PicTeX.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "cascade", label = "Save as", 
+        menu = GroupsTab.SaveAs.menu)
+    tkadd(GroupsTab.RightClick.Menu, "command", label = "Copy", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.Copy.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "separator")
+    tkadd(GroupsTab.RightClick.Menu, "command", label = "Print...", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.Print.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(GroupsTab.RightClick.Menu, "separator")
+    tkadd(GroupsTab.RightClick.Menu, "command", label = "External", 
+        command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "3"
+            DiagnosticTabs.ExternalWindow.cmd()
+            GUI.BindingsOn()
+        })
+    DiagnosticTabs.Axes <- tk2frame(DiagnosticTabs.nb)
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Axes, text = "Axes")
+    AxesTab.image <- mytkrplot(DiagnosticTabs.Axes, fun = function() {
+        par(mar = c(0, 0, 0, 0), bg = "white")
+        plot(0, 0, type = "n", xaxt = "n", yaxt = "n", main = "", 
+            xlab = "", ylab = "", bty = "n")
+    }, hscale = ConvergenceTab.HorizontalScale.func(), vscale = ConvergenceTab.VerticalScale.func())
+    tkplace(AxesTab.image, relwidth = 1, relheight = 1, `in` = DiagnosticTabs.Axes)
+    AxesTab.RightClick.Menu <- tk2menu(AxesTab.image, tearoff = FALSE)
+    tkadd(AxesTab.RightClick.Menu, "checkbutton", label = "Show title", 
+        variable = AxesTab.ShowTitle.var, command = function() {
+            GUI.BindingsOff()
+            AxesTab.ShowTitle.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "checkbutton", label = "Show axis labels", 
+        variable = AxesTab.ShowAxisLabels.var, command = function() {
+            GUI.BindingsOff()
+            AxesTab.ShowAxisLabels.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "separator")
+    tkadd(AxesTab.RightClick.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.DiagnosticTabs.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "separator")
+    AxesTab.SaveAs.menu <- tk2menu(AxesTab.image, tearoff = FALSE)
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "PDF...", 
+        variable = File.SaveAs.var, value = "0", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.PDF.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Postscript...", 
+        variable = File.SaveAs.var, value = "1", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Postscript.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Metafile...", 
+        variable = File.SaveAs.var, value = "2", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Metafile.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Bmp...", 
+        variable = File.SaveAs.var, value = "3", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Bmp.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "Png...", 
+        variable = File.SaveAs.var, value = "4", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Png.cmd()
+            GUI.BindingsOn()
+        })
+    AxesTab.SaveAs.Jpeg.menu <- tk2menu(AxesTab.SaveAs.menu, 
+        tearoff = FALSE)
+    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "50% quality...", 
+        variable = File.SaveAs.var, value = "5", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 50
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "75% quality...", 
+        variable = File.SaveAs.var, value = "6", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 75
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.Jpeg.menu, "radiobutton", label = "100% quality...", 
+        variable = File.SaveAs.var, value = "7", command = function() {
+            GUI.BindingsOff()
+            File.Jpeg.quality <<- 100
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.Jpeg.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.SaveAs.menu, "cascade", label = "Jpeg", menu = AxesTab.SaveAs.Jpeg.menu)
+    tkadd(AxesTab.SaveAs.menu, "radiobutton", label = "PicTeX", 
+        variable = File.SaveAs.var, value = "8", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.SaveAs.PicTeX.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "cascade", label = "Save as", 
+        menu = AxesTab.SaveAs.menu)
+    tkadd(AxesTab.RightClick.Menu, "command", label = "Copy", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.Copy.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "separator")
+    tkadd(AxesTab.RightClick.Menu, "command", label = "Print...", 
+        state = if (.Platform$OS.type != "windows") 
+            "disabled"
+        else "normal", command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.Print.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(AxesTab.RightClick.Menu, "separator")
+    tkadd(AxesTab.RightClick.Menu, "command", label = "External", 
+        command = function() {
+            GUI.BindingsOff()
+            DiagnosticTabs.which <<- "4"
+            DiagnosticTabs.ExternalWindow.cmd()
+            GUI.BindingsOn()
+        })
+    DiagnosticTabs.Predictions <- tk2frame(DiagnosticTabs.nb)
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Predictions, text = "Predictions")
+    PredictionsTab.arrayR <- NULL
+    PredictionsTab.arrayTcl <- NULL
+    PredictionsTab.ColumnsUsed <- NULL
+    PredictionsTab.table <- NULL
+    PredictionsTab.yscr <- NULL
+    PredictionsTab.InitialSetup <- TRUE
+    PredictionsTab.place <- function() {
+        tkplace(PredictionsTab.table, relx = 0.5, rely = 0.1, 
+            height = 290, `in` = DiagnosticTabs.Predictions, 
+            anchor = "n")
+        b <- as.numeric(tclvalue(tkwinfo("width", PredictionsTab.table)))
+        b <- as.numeric(tclvalue(tkwinfo("width", PredictionsTab.table)))
+        a <- as.numeric(tclvalue(tkwinfo("width", DiagnosticTabs.Convergence)))
+        cc <- a/2 + b/2
+        tkplace(PredictionsTab.yscr, x = cc - 1, rely = 0.1, 
+            height = 290, `in` = DiagnosticTabs.Predictions, 
+            anchor = "nw")
+    }
+    PredictionsTab.ArraySetup <- function() {
+        PredictionsTab.arrayR <<- c("Variable", bpar$axes.label.text[variables.in], 
+            "Predicted", rep(" ", p.in), "Actual", rep(" ", p.in), 
+            "RelAbsErr%", rep(" ", p.in))
+        dim(PredictionsTab.arrayR) <<- c(p.in + 1, 4)
+        if (PredictionsTab.InitialSetup) 
+            PredictionsTab.arrayTcl <<- tclArray()
+        else {
+            .Tcl(paste("unset ", PredictionsTab.arrayTcl, sep = ""))
+            PredictionsTab.arrayTcl <<- tclArray()
+        }
+        for (j in 0:3) PredictionsTab.arrayTcl[[0, j]] <<- PredictionsTab.arrayR[1, 
+            j + 1]
+        for (i in (1:p.in)) PredictionsTab.arrayTcl[[i, 0]] <<- PredictionsTab.arrayR[i + 
+            1, 1]
+        PredictionsTab.ColumnsUsed <<- 0
+        if (PredictionsTab.InitialSetup) {
+            PredictionsTab.table <<- tk2table(DiagnosticTabs.Predictions, 
+                variable = PredictionsTab.arrayTcl, rows = max(17, 
+                  p + 1), cols = 4, titlerows = 1, resizeborders = "none", 
+                selectmode = "browse", rowseparator = "\"\n\"", 
+                colseparator = "\"\t\"", padx = 5, background = "white", 
+                state = "disabled", yscrollcommand = function(...) tkset(PredictionsTab.yscr, 
+                  ...))
+            PredictionsTab.yscr <<- tkscrollbar(DiagnosticTabs.Predictions, 
+                command = function(...) tkyview(PredictionsTab.table, 
+                  ...))
+            PredictionsTab.InitialSetup <<- FALSE
+        }
+        else tkconfigure(PredictionsTab.table, variable = PredictionsTab.arrayTcl)
+        if (Biplot.axes.mode == 0) {
+            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
+                " tag cell Cell", temp1, ".0 ", temp1, ",0", 
+                sep = ""))
+            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
+                " tag configure Cell", temp1, ".0", " -fg ", 
+                bpar$axes.label.col[variables.in[temp1]], sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col VariableNames 0", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 1", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 2", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 3", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure title -anchor c", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure VariableNames -anchor w", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure NumericalOutput -anchor e", 
+                sep = ""))
+        }
+        else {
+            for (temp1 in 1:p.in) .Tcl(paste(PredictionsTab.table, 
+                " tag cell Cell", temp1, ".0 ", temp1, ",0", 
+                sep = ""))
+            for (temp1 in which(variables.in != Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
+                " tag configure Cell", temp1, ".0", " -fg ", 
+                bpar$interaction.highlight.axes.col.bg, sep = ""))
+            temp1 <- which(variables.in == Biplot.axes.WhichHighlight)
+            .Tcl(paste(PredictionsTab.table, " tag configure Cell", 
+                temp1, ".0", " -fg ", bpar$interaction.highlight.axes.col.fg, 
+                sep = ""))
+            for (temp1 in 1:3) .Tcl(paste(PredictionsTab.table, 
+                " tag cell Cell", which(variables.in == Biplot.axes.WhichHighlight), 
+                ".", temp1, " ", which(variables.in == Biplot.axes.WhichHighlight), 
+                ",", temp1, sep = ""))
+            for (temp1 in 1:3) .Tcl(paste(PredictionsTab.table, 
+                " tag configure Cell", which(variables.in == 
+                  Biplot.axes.WhichHighlight), ".", temp1, " -fg black", 
+                sep = ""))
+            for (temp1 in 1:3) for (temp2 in which(variables.in != 
+                Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
+                " tag cell Cell", temp2, ".", temp1, " ", temp2, 
+                ",", temp1, sep = ""))
+            for (temp1 in 1:3) for (temp2 in which(variables.in != 
+                Biplot.axes.WhichHighlight)) .Tcl(paste(PredictionsTab.table, 
+                " tag configure Cell", temp2, ".", temp1, " -fg ", 
+                bpar$interaction.highlight.axes.col.bg, sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col VariableNames 0", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 1", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 2", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag col NumericalOutput 3", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure title -anchor c", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure VariableNames -anchor w", 
+                sep = ""))
+            .Tcl(paste(PredictionsTab.table, " tag configure NumericalOutput -anchor e", 
+                sep = ""))
+        }
+        PredictionsTab.place()
+    }
+    PredictionsTab.ArraySetup()
+    DiagnosticTabs.Export <- tk2frame(DiagnosticTabs.nb)
+    ExportTab.frame <- tk2frame(DiagnosticTabs.Export, relief = "groove", 
+        borderwidth = "1.5p")
+    tkplace(ExportTab.frame, `in` = DiagnosticTabs.Export, relx = 0.525, 
+        rely = 0.475, relwidth = 0.755, relheight = 0.75, anchor = "center")
+    tkadd(DiagnosticTabs.nb, DiagnosticTabs.Export, text = "Export")
+    ExportTab.scrx <- tkscrollbar(ExportTab.frame, repeatinterval = 5, 
+        command = function(...) tkxview(ExportTab.tree, ...), 
+        orient = "horizontal")
+    ExportTab.scry <- tkscrollbar(ExportTab.frame, repeatinterval = 5, 
+        command = function(...) tkyview(ExportTab.tree, ...))
+    ExportTab.tree <- tkwidget(ExportTab.frame, "Tree", relief = "flat", 
+        dropenabled = "0", dragenabled = "0", bg = "white", padx = 4, 
+        xscrollcommand = function(...) tkset(ExportTab.scrx, 
+            ...), yscrollcommand = function(...) tkset(ExportTab.scry, 
+            ...))
+    tkplace(ExportTab.tree, relx = 0, rely = 0, relwidth = 0.945, 
+        relheight = 0.945, `in` = ExportTab.frame, anchor = "nw")
+    tkplace(ExportTab.scrx, relx = 0, rely = 1, relwidth = 0.95, 
+        `in` = ExportTab.frame, anchor = "sw")
+    tkplace(ExportTab.scry, relx = 1, rely = 0, relheight = 0.95, 
+        `in` = ExportTab.frame, anchor = "ne")
+    ExportTab.data <- NULL
+    ExportTab.data.name <- NULL
+    ExportTab.data.func <- NULL
+    ExportTab.Rvalue <- NULL
+    ExportTab.Nvalue <- NULL
+    ExportTab.DisplayInConsole.but <- tk2button(DiagnosticTabs.Export, 
+        text = "Display in console", command = function() {
+            GUI.BindingsOff()
+            ExportTab.DisplayInConsole.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(ExportTab.DisplayInConsole.but, relx = 0.24, rely = 0.92, 
+        relwidth = 0.28, height = 22, `in` = DiagnosticTabs.Export, 
+        anchor = "w")
     ExportTab.ExportToWorkspace.but <- tk2button(DiagnosticTabs.Export, 
         text = "Save to Workspace", command = function() {
             GUI.BindingsOff()
@@ -10860,22 +10819,38 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             GUI.BindingsOn()
         })
     tkplace(ExportTab.ExportToWorkspace.but, relx = 0.52, rely = 0.92, 
-        relwidth = 0.28, height = 22, "in" = DiagnosticTabs.Export, 
+        relwidth = 0.28, height = 22, `in` = DiagnosticTabs.Export, 
         anchor = "w")
-    Kraal.frame <- tkframe(GUI.TopLevel, relief = "groove", borderwidth = "1.5p")
-    tkplace(Kraal.frame, relx = 0.61, rely = 0.6725, relwidth = 0.385, 
-        relheight = 0.2671 + 0.005, "in" = GUI.TopLevel)
+    Kraal.par <- NULL
+    Kraal.xy <- NULL
+    Kraal.XY.move <- NULL
+    Kraal.XY.RightClick <- NULL
     Kraal.grid <- as.matrix(expand.grid(seq(from = 0, to = 1, 
         length.out = ceiling(sqrt(n + p)) + 3)[-c(1, ceiling(sqrt(n + 
         p)) + 3)], rev(seq(from = 0.05, to = 1, length.out = ceiling(sqrt(n + 
         p)) + 3)[-c(1, ceiling(sqrt(n + p)) + 3)])))
     Kraal.grid.open <- 1:nrow(Kraal.grid)
-    Kraal.HorizontalScale.func <- function() as.numeric(tkwinfo("width", 
-        Kraal.frame))/as.numeric(tkwinfo("fpixels", Kraal.frame, 
-        "1i"))/4
-    Kraal.VerticalScale.func <- function() as.numeric(tkwinfo("height", 
-        Kraal.frame))/as.numeric(tkwinfo("fpixels", Kraal.frame, 
-        "1i"))/4
+    Kraal.ConvertCoordinates <- function(xin, yin) {
+        width <- as.numeric(tclvalue(tkwinfo("width", Kraal.image)))
+        height <- as.numeric(tclvalue(tkwinfo("height", Kraal.image)))
+        x <- as.numeric(xin)/width
+        y <- 1 - as.numeric(yin)/height
+        figwidthprop <- Kraal.par$fig[2] - Kraal.par$fig[1]
+        figheightprop <- Kraal.par$fig[4] - Kraal.par$fig[3]
+        plotregionstartxprop <- figwidthprop * Kraal.par$plt[1] + 
+            Kraal.par$fig[1]
+        plotregionendxprop <- figwidthprop * Kraal.par$plt[2] + 
+            Kraal.par$fig[1]
+        plotregionstartyprop <- figheightprop * Kraal.par$plt[3] + 
+            Kraal.par$fig[3]
+        plotregionendyprop <- figheightprop * Kraal.par$plt[4] + 
+            Kraal.par$fig[3]
+        c((x - plotregionstartxprop)/(plotregionendxprop - plotregionstartxprop) * 
+            (Kraal.par$usr[2] - Kraal.par$usr[1]) + Kraal.par$usr[1], 
+            (y - plotregionstartyprop)/(plotregionendyprop - 
+                plotregionstartyprop) * (Kraal.par$usr[4] - Kraal.par$usr[3]) + 
+                Kraal.par$usr[3])
+    }
     Kraal.plot <- function() {
         par(mar = c(0, 0, 0, 0), bg = "white")
         plot(rbind(Kraal.points.Y, Kraal.axes.Y), type = "n", 
@@ -10912,46 +10887,23 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Kraal.par$strwidthx <<- strwidth("x")
         Kraal.par$strheightx <<- strheight("x")
     }
-    Kraal.image <- tkrplot(GUI.TopLevel, fun = function() {
-        par(mar = c(0, 0, 0, 0), bg = "white")
-        plot(0.5, 0.5, type = "n", xaxt = "n", yaxt = "n", xaxs = "i", 
-            yaxs = "i", xlim = c(0, 1), ylim = c(0, 1), main = "", 
-            xlab = "", ylab = "", bty = "n")
-        points(Kraal.grid, pch = "-", cex = 0.5, col = "gray95")
-    }, hscale = Kraal.HorizontalScale.func(), vscale = Kraal.VerticalScale.func())
-    tkplace(Kraal.image, "in" = Kraal.frame, relwidth = 1, relheight = 1)
     Kraal.replot <- function() tkrreplot(Kraal.image, fun = Kraal.plot, 
         hscale = Kraal.HorizontalScale.func(), vscale = Kraal.VerticalScale.func())
-    Kraal.par <- NULL
-    Kraal.ConvertCoordinates <- function(xin, yin) {
-        width <- as.numeric(tclvalue(tkwinfo("width", Kraal.image)))
-        height <- as.numeric(tclvalue(tkwinfo("height", Kraal.image)))
-        x <- as.numeric(xin)/width
-        y <- 1 - as.numeric(yin)/height
-        figwidthprop <- Kraal.par$fig[2] - Kraal.par$fig[1]
-        figheightprop <- Kraal.par$fig[4] - Kraal.par$fig[3]
-        plotregionstartxprop <- figwidthprop * Kraal.par$plt[1] + 
-            Kraal.par$fig[1]
-        plotregionendxprop <- figwidthprop * Kraal.par$plt[2] + 
-            Kraal.par$fig[1]
-        plotregionstartyprop <- figheightprop * Kraal.par$plt[3] + 
-            Kraal.par$fig[3]
-        plotregionendyprop <- figheightprop * Kraal.par$plt[4] + 
-            Kraal.par$fig[3]
-        c((x - plotregionstartxprop)/(plotregionendxprop - plotregionstartxprop) * 
-            (Kraal.par$usr[2] - Kraal.par$usr[1]) + Kraal.par$usr[1], 
-            (y - plotregionstartyprop)/(plotregionendyprop - 
-                plotregionstartyprop) * (Kraal.par$usr[4] - Kraal.par$usr[3]) + 
-                Kraal.par$usr[3])
-    }
-    Kraal.xy <- NULL
-    Kraal.XY.move <- NULL
-    Kraal.XY.RightClick <- NULL
     Kraal.motion <- function(x, y) {
         Kraal.XY.move <<- Kraal.ConvertCoordinates(x, y)
         if (Kraal.OverPoint() || Kraal.OverAxis() || Kraal.moving.status) 
             tkconfigure(GUI.TopLevel, cursor = "hand2")
         else tkconfigure(GUI.TopLevel, cursor = "arrow")
+    }
+    Kraal.OverPoint <- function() {
+        n.in < n && min(PythagorasDistance(matrix(Kraal.XY.move, 
+            nrow = 1), Kraal.points.Y)) < min(Kraal.par$strwidthx, 
+            Kraal.par$strheightx)/1
+    }
+    Kraal.OverAxis <- function() {
+        p.in < p && min(PythagorasDistance(matrix(Kraal.XY.move, 
+            nrow = 1), Kraal.axes.Y)) < min(Kraal.par$strwidthx, 
+            Kraal.par$strheightx)/0.5
     }
     Kraal.LeftClick <- function(x, y) {
         Kraal.XY.move <<- Kraal.ConvertCoordinates(x, y)
@@ -11008,16 +10960,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     }
     Kraal.LeftReleaseFromBiplot <- NULL
     Kraal.DoubleLeftClick <- NULL
-    Kraal.OverPoint <- function() {
-        n.in < n && min(PythagorasDistance(matrix(Kraal.XY.move, 
-            nrow = 1), Kraal.points.Y)) < min(Kraal.par$strwidthx, 
-            Kraal.par$strheightx)/1
-    }
-    Kraal.OverAxis <- function() {
-        p.in < p && min(PythagorasDistance(matrix(Kraal.XY.move, 
-            nrow = 1), Kraal.axes.Y)) < min(Kraal.par$strwidthx, 
-            Kraal.par$strheightx)/0.5
-    }
     Kraal.RightClick <- function(x, y) {
         Kraal.xy <<- c(x, y)
         Kraal.XY.RightClick <<- Kraal.ConvertCoordinates(x, y)
@@ -11031,80 +10973,6 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         else tkpopup(Kraal.RightClick.Menu, tclvalue(tkwinfo("pointerx", 
             Kraal.image)), tclvalue(tkwinfo("pointery", Kraal.image)))
     }
-    Kraal.RightClickOnPoint.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
-    tkadd(Kraal.RightClickOnPoint.Menu, "command", label = "Return to biplot", 
-        command = function() {
-            GUI.BindingsOff()
-            Kraal.moving.type <<- "point"
-            Kraal.moving.which <<- Kraal.samples.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
-                nrow = 1), Kraal.points.Y))]
-            Kraal.out.func()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClickOnPoint.Menu, "separator")
-    tkadd(Kraal.RightClickOnPoint.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            if (g > 1) {
-                temp1 <- Kraal.samples.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
-                  nrow = 1), Kraal.points.Y))]
-                temp2 <- as.numeric(group[temp1]) + 1
-            }
-            else temp2 <- 1
-            Format.ByGroup.cmd(temp2)
-            GUI.BindingsOn()
-        })
-    Kraal.RightClickOnAxis.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
-    tkadd(Kraal.RightClickOnAxis.Menu, "command", label = "Return to biplot", 
-        command = function() {
-            GUI.BindingsOff()
-            Kraal.moving.type <<- "axis"
-            Kraal.moving.which <<- Kraal.variables.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
-                nrow = 1), Kraal.axes.Y))]
-            Kraal.out.func()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClickOnAxis.Menu, "separator")
-    tkadd(Kraal.RightClickOnAxis.Menu, "command", label = "Format...", 
-        command = function() {
-            GUI.BindingsOff()
-            temp1 <- Kraal.variables.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
-                nrow = 1), Kraal.axes.Y))]
-            Format.Axes.cmd(WhichAxisInitially = temp1 + 1)
-            GUI.BindingsOn()
-        })
-    Kraal.RightClick.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
-    tkadd(Kraal.RightClick.Menu, "command", label = "Return points", 
-        state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnPoints.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClick.Menu, "command", label = "Return axes", 
-        state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnAxes.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClick.Menu, "command", label = "Return all", 
-        state = "disabled", command = function() {
-            GUI.BindingsOff()
-            Kraal.ReturnAll.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClick.Menu, "separator")
-    tkadd(Kraal.RightClick.Menu, "command", label = "Format by group...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.ByGroup.cmd()
-            GUI.BindingsOn()
-        })
-    tkadd(Kraal.RightClick.Menu, "command", label = "Format axes...", 
-        command = function() {
-            GUI.BindingsOff()
-            Format.Axes.cmd()
-            GUI.BindingsOn()
-        })
     Kraal.points.Y <- NULL
     Kraal.samples.in <- NULL
     Kraal.samples.WhereInGrid <- NULL
@@ -11154,8 +11022,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Kraal.points.Y <<- matrix(Kraal.points.Y, ncol = 2)
             Kraal.samples.WhereInGrid <<- Kraal.samples.WhereInGrid[temp6]
             Kraal.grid.open <<- Kraal.grid.open[-temp5]
-            tkconfigure(ControlButtons.ReturnPoints.but, state = "normal")
-            tkconfigure(ControlButtons.ReturnAll.but, state = "normal")
+            tkconfigure(Other.ReturnPoints.but, state = "normal")
+            tkconfigure(Other.ReturnAll.but, state = "normal")
             for (temp7 in c(0, 2)) tkentryconfigure(Kraal.RightClick.Menu, 
                 temp7, state = "normal")
         }
@@ -11175,8 +11043,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Additional.Interpolate.ANewSample.var <<- tclVar("0")
             Additional.Interpolate.ANewSample.values <<- matrix(colMeans(Data[samples.in, 
                 variables.in]), ncol = 1)
-            tkconfigure(ControlButtons.ReturnAxes.but, state = "normal")
-            tkconfigure(ControlButtons.ReturnAll.but, state = "normal")
+            tkconfigure(Other.ReturnAxes.but, state = "normal")
+            tkconfigure(Other.ReturnAll.but, state = "normal")
             if (Biplot.axes.mode == 1 && Biplot.axes.WhichHighlight == 
                 Kraal.moving.which) {
                 Biplot.axes.WhichHighlight <<- 0
@@ -11210,8 +11078,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Kraal.samples.in <<- Kraal.samples.in[Kraal.samples.in != 
                 Kraal.moving.which]
             if (n.in == n) {
-                tkconfigure(ControlButtons.ReturnPoints.but, 
-                  state = "disabled")
+                tkconfigure(Other.ReturnPoints.but, state = "disabled")
                 tkentryconfigure(Kraal.RightClick.Menu, 0, state = "disabled")
             }
         }
@@ -11231,13 +11098,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             Additional.Interpolate.ANewSample.values <<- matrix(colMeans(Data[samples.in, 
                 variables.in]), ncol = 1)
             if (p.in == p) {
-                tkconfigure(ControlButtons.ReturnAxes.but, state = "disabled")
+                tkconfigure(Other.ReturnAxes.but, state = "disabled")
                 tkentryconfigure(Kraal.RightClick.Menu, 1, state = "disabled")
             }
             PredictionsTab.ArraySetup()
         }
         if (n.in == n && p.in == p) {
-            tkconfigure(ControlButtons.ReturnAll.but, state = "disabled")
+            tkconfigure(Other.ReturnAll.but, state = "disabled")
             tkentryconfigure(Kraal.RightClick.Menu, 2, state = "disabled")
         }
         Kraal.replot()
@@ -11254,10 +11121,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         groups.in <<- 1:g
         g.in <<- g
         g.n.in <<- g.n
-        tkconfigure(ControlButtons.ReturnPoints.but, state = "disabled")
+        tkconfigure(Other.ReturnPoints.but, state = "disabled")
         tkentryconfigure(Kraal.RightClick.Menu, 0, state = "disabled")
         if (p == p.in) {
-            tkconfigure(ControlButtons.ReturnAll.but, state = "disabled")
+            tkconfigure(Other.ReturnAll.but, state = "disabled")
             tkentryconfigure(Kraal.RightClick.Menu, 2, state = "disabled")
         }
         Kraal.replot()
@@ -11274,10 +11141,10 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Additional.Interpolate.ANewSample.var <<- tclVar("0")
         Additional.Interpolate.ANewSample.values <<- matrix(colMeans(Data[samples.in, 
             variables.in]), ncol = 1)
-        tkconfigure(ControlButtons.ReturnAxes.but, state = "disabled")
+        tkconfigure(Other.ReturnAxes.but, state = "disabled")
         tkentryconfigure(Kraal.RightClick.Menu, 1, state = "disabled")
         if (n == n.in) {
-            tkconfigure(ControlButtons.ReturnAll.but, state = "disabled")
+            tkconfigure(Other.ReturnAll.but, state = "disabled")
             tkentryconfigure(Kraal.RightClick.Menu, 2, state = "disabled")
         }
         PredictionsTab.ArraySetup()
@@ -11304,11 +11171,11 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Kraal.variables.WhereInGrid <<- NULL
         variables.in <<- 1:p
         p.in <<- p
-        tkconfigure(ControlButtons.ReturnPoints.but, state = "disabled")
+        tkconfigure(Other.ReturnPoints.but, state = "disabled")
         tkentryconfigure(Kraal.RightClick.Menu, 0, state = "disabled")
-        tkconfigure(ControlButtons.ReturnAxes.but, state = "disabled")
+        tkconfigure(Other.ReturnAxes.but, state = "disabled")
         tkentryconfigure(Kraal.RightClick.Menu, 1, state = "disabled")
-        tkconfigure(ControlButtons.ReturnAll.but, state = "disabled")
+        tkconfigure(Other.ReturnAll.but, state = "disabled")
         tkentryconfigure(Kraal.RightClick.Menu, 2, state = "disabled")
         PredictionsTab.ArraySetup()
         Kraal.replot()
@@ -11336,6 +11203,226 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             "Log, centre, scale", "Log, unitise, centre"), height = 6)
         SettingsBox.transformation.cmd()
     }
+    Kraal.frame <- tkframe(GUI.TopLevel, relief = "groove", borderwidth = "1.5p")
+    tkplace(Kraal.frame, relx = 0.61, rely = 0.6725, relwidth = 0.385, 
+        relheight = 0.2671 + 0.005, `in` = GUI.TopLevel)
+    Kraal.HorizontalScale.func <- function() {
+        temp1 <- as.numeric(tkwinfo("width", Kraal.frame))
+        temp1 <- as.numeric(tkwinfo("width", Kraal.frame))
+        temp1/as.numeric(tkwinfo("fpixels", Kraal.frame, "1i"))/4
+    }
+    Kraal.VerticalScale.func <- function() as.numeric(tkwinfo("height", 
+        Kraal.frame))/as.numeric(tkwinfo("fpixels", Kraal.frame, 
+        "1i"))/4
+    Kraal.image <- tkrplot(GUI.TopLevel, fun = function() {
+        par(mar = c(0, 0, 0, 0), bg = "white")
+        plot(0.5, 0.5, type = "n", xaxt = "n", yaxt = "n", xaxs = "i", 
+            yaxs = "i", xlim = c(0, 1), ylim = c(0, 1), main = "", 
+            xlab = "", ylab = "", bty = "n")
+        points(Kraal.grid, pch = "-", cex = 0.5, col = "gray95")
+    }, hscale = Kraal.HorizontalScale.func(), vscale = Kraal.VerticalScale.func())
+    tkplace(Kraal.image, `in` = Kraal.frame, relwidth = 1, relheight = 1)
+    Kraal.RightClick.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
+    tkadd(Kraal.RightClick.Menu, "command", label = "Return points", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnPoints.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClick.Menu, "command", label = "Return axes", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnAxes.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClick.Menu, "command", label = "Return all", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnAll.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClick.Menu, "separator")
+    tkadd(Kraal.RightClick.Menu, "command", label = "Format by group...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.ByGroup.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClick.Menu, "command", label = "Format axes...", 
+        command = function() {
+            GUI.BindingsOff()
+            Format.Axes.cmd()
+            GUI.BindingsOn()
+        })
+    Kraal.RightClickOnPoint.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
+    tkadd(Kraal.RightClickOnPoint.Menu, "command", label = "Return to biplot", 
+        command = function() {
+            GUI.BindingsOff()
+            Kraal.moving.type <<- "point"
+            Kraal.moving.which <<- Kraal.samples.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
+                nrow = 1), Kraal.points.Y))]
+            Kraal.out.func()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClickOnPoint.Menu, "separator")
+    tkadd(Kraal.RightClickOnPoint.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            if (g > 1) {
+                temp1 <- Kraal.samples.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
+                  nrow = 1), Kraal.points.Y))]
+                temp2 <- as.numeric(group[temp1]) + 1
+            }
+            else temp2 <- 1
+            Format.ByGroup.cmd(temp2)
+            GUI.BindingsOn()
+        })
+    Kraal.RightClickOnAxis.Menu <- tk2menu(Kraal.image, tearoff = FALSE)
+    tkadd(Kraal.RightClickOnAxis.Menu, "command", label = "Return to biplot", 
+        command = function() {
+            GUI.BindingsOff()
+            Kraal.moving.type <<- "axis"
+            Kraal.moving.which <<- Kraal.variables.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
+                nrow = 1), Kraal.axes.Y))]
+            Kraal.out.func()
+            GUI.BindingsOn()
+        })
+    tkadd(Kraal.RightClickOnAxis.Menu, "separator")
+    tkadd(Kraal.RightClickOnAxis.Menu, "command", label = "Format...", 
+        command = function() {
+            GUI.BindingsOff()
+            temp1 <- Kraal.variables.in[which.min(PythagorasDistance(matrix(Kraal.XY.RightClick, 
+                nrow = 1), Kraal.axes.Y))]
+            Format.Axes.cmd(WhichAxisInitially = temp1 + 1)
+            GUI.BindingsOn()
+        })
+    Other.DisplayInExternalWindow.AsIs.cmd <- function() {
+        .Tcl("update")
+        if (boptions$ReuseExternalWindows && dev.cur() > 1) 
+            graphics.off()
+        x11(width = 7, height = 7)
+        Biplot.plot()
+        .Tcl("update")
+    }
+    Other.DisplayInExternalWindow.In3D.cmd <- function() {
+        Biplot.plot3D()
+    }
+    Other.HidePoints.var <- tclVar("0")
+    Other.HidePoints.cmd <- function() {
+        if (tclvalue(Other.HidePoints.var) == "1") {
+            View.ShowPointValues.var <<- tclVar("0")
+            View.ShowGroupLabelsInLegend.var <<- tclVar("0")
+            if (tclvalue(Biplot.points.mode) == "2") 
+                Biplot.points.mode <<- tclVar("1")
+        }
+        else {
+            View.ShowPointValues.var <<- tclVar("1")
+            if (g > 1) 
+                View.ShowGroupLabelsInLegend.var <<- tclVar("1")
+        }
+        Biplot.replot()
+    }
+    Other.HideAxes.var <- tclVar("0")
+    Other.HideAxes.cmd <- function() {
+        if (tclvalue(Other.HideAxes.var) == "1") {
+            View.AxisLabels.var <<- tclVar("-1")
+            Biplot.points.mode <<- tclVar("-1")
+        }
+        else {
+            if (tclvalue(Biplot.Axes.var) %in% c("13", "14")) 
+                View.AxisLabels.var <<- tclVar("2")
+            else View.AxisLabels.var <<- tclVar("1")
+            Biplot.points.mode <<- tclVar("0")
+        }
+        Biplot.replot()
+    }
+    Other.LiveUpdates.var <- tclVar("1")
+    Other.Stop.var <- FALSE
+    Other.Stop.cmd <- function() {
+        Other.Stop.var <<- TRUE
+    }
+    Other.frame <- tkframe(GUI.TopLevel, relief = "groove", borderwidth = "1.5p")
+    Other.ProgressBar.pb <- ttkprogressbar(Other.frame, mode = "determinate")
+    Other.ProgressBar.create <- function() tkplace(Other.ProgressBar.pb, 
+        relx = 0.005, rely = 0.5, relwidth = 0.1, height = 18, 
+        `in` = Other.frame, anchor = "w")
+    Other.ProgressBar.create()
+    Other.ProgressBar.destroy <- function() tkplace(Other.ProgressBar.pb, 
+        width = 0, height = 0)
+    Other.External.but <- tk2menubutton(Other.frame, text = "External", 
+        direction = "above")
+    Other.External.menu <- tk2menu(MenuBar.menu, tearoff = FALSE)
+    tkadd(Other.External.menu, "command", label = "As is", underline = "3", 
+        accelerator = "F11", command = function() {
+            GUI.BindingsOff()
+            Other.DisplayInExternalWindow.AsIs.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Other.External.menu, "command", label = "In 3D", underline = "3", 
+        accelerator = "F12", command = function() {
+            GUI.BindingsOff()
+            Other.DisplayInExternalWindow.In3D.cmd()
+            GUI.BindingsOn()
+        })
+    tkconfigure(Other.External.but, menu = Other.External.menu)
+    tkplace(Other.External.but, relx = 0.12, rely = 0.5, relwidth = 0.075, 
+        height = 22, `in` = Other.frame, anchor = "w")
+    Other.Hide.but <- tk2menubutton(Other.frame, text = "Hide", 
+        direction = "above")
+    Other.Hide.menu <- tk2menu(MenuBar.menu, tearoff = FALSE)
+    tkadd(Other.Hide.menu, "checkbutton", label = "Points", underline = "0", 
+        variable = Other.HidePoints.var, command = function() {
+            GUI.BindingsOff()
+            Other.HidePoints.cmd()
+            GUI.BindingsOn()
+        })
+    tkadd(Other.Hide.menu, "checkbutton", label = "Axes", underline = "0", 
+        variable = Other.HideAxes.var, command = function() {
+            GUI.BindingsOff()
+            Other.HideAxes.cmd()
+            GUI.BindingsOn()
+        })
+    tkconfigure(Other.Hide.but, menu = Other.Hide.menu)
+    tkplace(Other.Hide.but, relx = 0.2075, rely = 0.5, relwidth = 0.055, 
+        height = 22, `in` = Other.frame, anchor = "w")
+    Other.LiveUpdates.chk <- tk2checkbutton(Other.frame, text = "Live updates", 
+        variable = Other.LiveUpdates.var)
+    tkplace(Other.LiveUpdates.chk, relx = 0.29, rely = 0.5, relwidth = 0.0745, 
+        relheight = 0.625, `in` = Other.frame, anchor = "w")
+    Other.Stop.but <- tk2button(Other.frame, text = "Stop", state = "disabled", 
+        command = function() {
+            GUI.BindingsOff()
+            Other.Stop.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(Other.Stop.but, relx = 0.405, rely = 0.5, relwidth = 0.07, 
+        height = 22, `in` = Other.frame, anchor = "w")
+    Other.ReturnPoints.but <- tk2button(Other.frame, text = "Return points", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnPoints.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(Other.ReturnPoints.but, relx = 0.6703 + 0.005, rely = 0.5, 
+        relwidth = 0.075, height = 22, `in` = Other.frame, anchor = "w")
+    Other.ReturnAxes.but <- tk2button(Other.frame, text = "Return axes", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnAxes.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(Other.ReturnAxes.but, relx = 0.765 + 0.005, rely = 0.5, 
+        relwidth = 0.075, height = 22, `in` = Other.frame, anchor = "w")
+    Other.ReturnAll.but <- tk2button(Other.frame, text = "Return all", 
+        state = "disabled", command = function() {
+            GUI.BindingsOff()
+            Kraal.ReturnAll.cmd()
+            GUI.BindingsOn()
+        })
+    tkplace(Other.ReturnAll.but, relx = 0.8597 + 0.005, rely = 0.5, 
+        relwidth = 0.075, height = 22, `in` = Other.frame, anchor = "w")
+    tkplace(Other.frame, relx = 0.005, rely = 0.95, relwidth = 0.99, 
+        relheight = 0.045, `in` = GUI.TopLevel)
     bparp.func()
     tkselect(DiagnosticTabs.nb, 3)
     SettingsBox.transformation.cmd()
