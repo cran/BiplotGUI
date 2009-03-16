@@ -1,14 +1,10 @@
-Biplots <-
+`Biplots` <-
 function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data), 
     AxisLabels = colnames(Data), excel = NULL, ExcelGroupsCol = 0) 
 {
     tclRequire("BWidget")
-    if (!missing(excel)) {
-        Data <- read.xls(excel)
-        if (ExcelGroupsCol > 0) {
-            groups <- Data[, ExcelGroupsCol]
-            Data <- Data[, -ExcelGroupsCol]
-        }
+    if (!missing(excel) | !missing(ExcelGroupsCol)) {
+        stop("Due to the removal of the `xlsReadWrite' package from CRAN, the direct import of data from Excel 1997-2003 files has been deprecated as from BiplotGUI 0.0-4.1. As an alternative mechanism, consider the `RODBC' package.")
     }
     Data <- as.matrix(Data)
     n <- nrow(Data)
@@ -5939,7 +5935,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     }
     Help.About.cmd <- function() {
         tkmessageBox(title = "About", parent = GUI.TopLevel, 
-            message = "Anthony la Grange\n<amlg at sun.ac.za>\n\nVersion 0.0-4\n\nDistributed under the GPL-3 license available from \nhttp://www.r-project.org/Licenses/", 
+            message = "Anthony la Grange\n<amlg at sun.ac.za>\n\nVersion 0.0-4.1\n\nDistributed under the GPL-3 license available from \nhttp://www.r-project.org/Licenses/", 
             icon = "info", type = "ok")
     }
     MenuBar.menu <- tk2menu(GUI.TopLevel)
