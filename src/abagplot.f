@@ -1,9 +1,9 @@
-C  Adapted by NJ le Roux from the original code for bagplots by PJ Rousseeuw, I Ruts and JW Tukey.
-C  The original code can be downloaded from http://www.agoras.ua.ac.be/Locdept.htm
+C
+
       SUBROUTINE abagplot(n,alpha1,x,y,whisk,tukm,interpx, interpy,num,
      +    datatyp,indoutl,datatyp2,pxpy,boxpl,nointer)
 C
-C  This subroutine computes a alpha-bag for any bivariate data set.
+C  This subroutine computes a alphabagplot for any bivariate data set.
 C
 C  There is a choice between computing all the whiskers (take whisk equal
 C  to 1), or few whiskers (only one whisker on each edge of the bag - take
@@ -15,6 +15,9 @@ C  If all the points are (nearly) collinear, the bagplot reduces to the
 C  usual boxplot for univariate data. 
 C  In this case, boxplot is set equal to 1 or 2.
 C
+C  Version: 15 December 1999
+C
+  
       implicit integer(i-n), double precision(a-h,o-z)
       PARAMETER(MAXN=2500, MAXM=MAXN*(MAXN-1)/2, MAXNUM=500000)
       INTEGER NCIRQ(MAXN),MCIRQ(MAXN),NRANK(MAXN),F(MAXN)
@@ -2177,14 +2180,16 @@ C
 C
 C     Draws n elements out of a dataset of size ntot, such that
 C     the selected case numbers are uniformly distributed from 1 to ntot.
-C
+C	  Where bp_uniran(1, ...) has been changed to bp_uniran(2, ...)
+C     and	int(urand*... to int(urand(1)*...
+
 	integer a(n)
 	integer seed,nrand
-        double precision urand
+        double precision urand(2)
 	jndex=0
 	do 20 m=1,n
-          call bp_uniran(1,seed,urand)
-	  nrand=int(urand*(ntot-jndex))+1 
+          call bp_uniran(2,seed,urand)
+	  nrand=int(urand(2)*(ntot-jndex))+1 
 	  jndex=jndex+1
 	  if(jndex.eq.1) then
 	    a(jndex)=nrand

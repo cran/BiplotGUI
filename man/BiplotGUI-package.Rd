@@ -1,6 +1,6 @@
 \name{BiplotGUI-package}
 \alias{BiplotGUI-package}
-\alias{BiplotGUI}
+% \alias{BiplotGUI}
 \docType{package}
 \title{
 BiplotGUI: Interactive Biplots in R
@@ -12,21 +12,25 @@ A GUI with which to construct and interact with biplots.
 \tabular{ll}{
 Package: \tab BiplotGUI\cr
 Type: \tab Package\cr
-Version: \tab 0.0-6\cr
-Date: \tab 2010-02-14\cr
+Version: \tab 0.0-7\cr
+Date: \tab 2013-03-11\cr
 License: \tab GPL-3 or later\cr
 LazyLoad: \tab yes\cr
 }
-The \code{Biplots} function initialises the GUI.
+The \code{Biplots()} function initialises the GUI.
 
-At present, \pkg{BiplotGUI} is intended to be run under Windows. In Windows, it runs marginally better in SDI mode, rather than MDI mode. 
+At present, \bold{BiplotGUI} is intended to be run under Windows.
+In Windows, it runs marginally better in SDI mode, rather than MDI mode.
+
 }
 \author{
-Author and maintainer: Anthony la Grange 
+Anthony la Grange
 
+Maintainer: Niel le Roux \email{njlr@sun.ac.za}
 Includes Fortran code adapted by NJ le Roux from the original by PJ Rousseeuw, I Ruts and JW Tukey.
+
 }
 \references{
-  Gower JC, Hand DJ (1996). \emph{Biplots}. Monographs on Statistics and Applied Probability. Chapman \& Hall, London, UK.
+Gower JC, Hand DJ (1996). \emph{Biplots}. Monographs on Statistics and Applied Probability. Chapman & Hall, London, UK.
 }
-\keyword{ package }
+

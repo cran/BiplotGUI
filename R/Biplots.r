@@ -3,6 +3,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     AxisLabels = colnames(Data), excel = NULL, ExcelGroupsCol = 0) 
 {
     tclRequire("BWidget")
+	
     if (!missing(excel) | !missing(ExcelGroupsCol)) {
         stop("Due to the removal of the `xlsReadWrite' package from CRAN, the direct import of data from Excel 1997-2003 files has been deprecated as from BiplotGUI 0.0-4.1. As an alternative mechanism, consider the `RODBC' package.")
     }
@@ -1102,6 +1103,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         }
         tkfocus(GUI.TopLevel)
     }
+
     File.SaveAs.Postscript.cmd <- function() {
         FileName <- tclvalue(tkgetSaveFile(filetypes = "{{Postscript files} {.ps}} {{All files} *}"))
         if (nchar(FileName)) {
@@ -4057,24 +4059,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   function(pi) t1[j] <= pi & pi <= t1[k + 2]))
             }, {
                 for (j in 2:(k + 1 + r)) M[, j - 1] <- sapply(diss, 
-                  function(pi) if (t1[j - 1] <= pi & pi < t1[j]) 
-                    (pi - t1[j - 1])/(t1[j] - t1[j - 1])
-                  else if (t1[j] <= pi & pi <= t1[k + 2]) 
-                    1
-                  else 0)
+                  function(pi) if (t1[j - 1] <= pi & pi < t1[j]) (pi - 
+                    t1[j - 1])/(t1[j] - t1[j - 1]) else if (t1[j] <= 
+                    pi & pi <= t1[k + 2]) 1 else 0)
             }, {
                 t1 <- c(min(t1), t1, max(t1))
                 for (j in 3:(k + 2 + r)) M[, j - 2] <- sapply(diss, 
                   function(pi) if (t1[j - 2] <= pi & pi < t1[j - 
-                    1]) 
-                    (t1[j - 2] - pi)^2/(t1[j - 1] - t1[j - 2])/(t1[j] - 
-                      t1[j - 2])
-                  else if (t1[j - 1] <= pi & pi < t1[j]) 
-                    1 - (t1[j] - pi)^2/(t1[j] - t1[j - 1])/(t1[j] - 
-                      t1[j - 2])
-                  else if (t1[j] <= pi & pi <= t1[k + 3]) 
-                    1
-                  else 0)
+                    1]) (t1[j - 2] - pi)^2/(t1[j - 1] - t1[j - 
+                    2])/(t1[j] - t1[j - 2]) else if (t1[j - 1] <= 
+                    pi & pi < t1[j]) 1 - (t1[j] - pi)^2/(t1[j] - 
+                    t1[j - 1])/(t1[j] - t1[j - 2]) else if (t1[j] <= 
+                    pi & pi <= t1[k + 3]) 1 else 0)
             })
             M <- cbind(1, M)
             Points.MDS.SplineM <<- M
@@ -5252,9 +5248,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         if (tclvalue(Additional.Interpolate.SampleGroupMeans.var) == 
             "1") {
             Additional.Interpolate.SampleGroupMeans.label.text <<- switch(as.character(Additional.Interpolate.SampleGroupMeans.for), 
-                `-1` = "All samples", `0` = if (g == 1) 
-                  "All samples"
-                else bpar$groups.label.text[groups.in], bpar$groups.label.text[Additional.Interpolate.SampleGroupMeans.for])
+                `-1` = "All samples", `0` = if (g == 1) "All samples" else bpar$groups.label.text[groups.in], 
+                bpar$groups.label.text[Additional.Interpolate.SampleGroupMeans.for])
             Additional.Interpolate.SampleGroupMeans.autcmd()
         }
         else {
@@ -5390,10 +5385,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   ]), temp1[1])], ]), {
                 temp1 <- which(as.numeric(group[samples.in]) == 
                   Additional.ConvexHullAlphaBag.for)
-                if (length(temp1) > 0) 
-                  Additional.ConvexHullAlphaBag.coordinates <<- list(Y[temp1[c(temp2 <- chull(Y[temp1, 
-                    ]), temp2[1])], ])
-                else Additional.ConvexHullAlphaBag.coordinates <<- NULL
+                if (length(temp1) > 0) Additional.ConvexHullAlphaBag.coordinates <<- list(Y[temp1[c(temp2 <- chull(Y[temp1, 
+                  ]), temp2[1])], ]) else Additional.ConvexHullAlphaBag.coordinates <<- NULL
             })
     }
     Additional.ConvexHullAlphaBag.for <- 0
@@ -5515,9 +5508,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         Additional.ConvexHullAlphaBag.FirstRun <<- TRUE
         if (tclvalue(Additional.AlphaBag.var) == "1") {
             Additional.ConvexHullAlphaBag.TukeyMedian.label.text <<- switch(as.character(Additional.ConvexHullAlphaBag.for), 
-                `-1` = "All points", `0` = if (g == 1) 
-                  "All points"
-                else bpar$groups.label.text[groups.in], bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])
+                `-1` = "All points", `0` = if (g == 1) "All points" else bpar$groups.label.text[groups.in], 
+                bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])
             Additional.AlphaBag.autcmd()
         }
         else {
@@ -5612,8 +5604,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   Additional.ConvexHullAlphaBag.coordinates <<- list(temp2[[1]])
                   Additional.ConvexHullAlphaBag.TukeyMedian.coordinates <<- matrix(temp2[[2]], 
                     ncol = 2)
-                }
-                else {
+                } else {
                   Additional.ConvexHullAlphaBag.coordinates <<- NULL
                   Additional.ConvexHullAlphaBag.TukeyMedian.coordinates <<- c(NA, 
                     NA)
@@ -7585,8 +7576,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   temp7 <- bpar$gSampleGroupMeans.label.col
                   temp8 <- bpar$gSampleGroupMeans.label.HorizOffset
                   temp9 <- bpar$gSampleGroupMeans.label.VertOffset
-                }
-                else {
+                } else {
                   temp1 <- 22
                   temp2 <- 2
                   temp3 <- "black"
@@ -7644,8 +7634,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   temp1 <- bpar$gConvexHullAlphaBag.lty
                   temp2 <- bpar$gConvexHullAlphaBag.lwd
                   temp3 <- bpar$gConvexHullAlphaBag.col.fg
-                }
-                else {
+                } else {
                   temp1 <- 1
                   temp2 <- 4
                   temp3 <- hcl(0, 0, 60)
@@ -7674,8 +7663,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     temp10 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.col
                     temp11 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.HorizOffset
                     temp12 <- bpar$gConvexHullAlphaBag.TukeyMedian.label.VertOffset
-                  }
-                  else {
+                  } else {
                     temp4 <- 0
                     temp5 <- 2
                     temp6 <- hcl(0, 0, 60)
@@ -8200,9 +8188,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 switch(as.character(Additional.ConvexHullAlphaBag.for), 
                   `-1` = {
                     if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, "CH: All points")
-                    else Legend.legend <<- c(Legend.legend, "AB: All points")
+                      "1") Legend.legend <<- c(Legend.legend, 
+                      "CH: All points") else Legend.legend <<- c(Legend.legend, 
+                      "AB: All points")
                     Legend.text.col <<- c(Legend.text.col, "black")
                     Legend.lty <<- c(Legend.lty, if (g == 1) bpar$gConvexHullAlphaBag.lty else 1)
                     Legend.lwd <<- c(Legend.lwd, if (g == 1) bpar$gConvexHullAlphaBag.lwd else 4)
@@ -8216,11 +8204,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                     Legend.pt.bg <<- c(Legend.pt.bg, NA)
                   }, `0` = {
                     if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, paste("CH:", 
-                        bpar$groups.label.text[groups.in]))
-                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
-                      bpar$groups.label.text[groups.in]))
+                      "1") Legend.legend <<- c(Legend.legend, 
+                      paste("CH:", bpar$groups.label.text[groups.in])) else Legend.legend <<- c(Legend.legend, 
+                      paste("AB:", bpar$groups.label.text[groups.in]))
                     Legend.text.col <<- c(Legend.text.col, rep("black", 
                       g.in))
                     Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[groups.in])
@@ -8236,11 +8222,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                       g.in))
                   }, {
                     if (tclvalue(Additional.ConvexHull.var) == 
-                      "1") 
-                      Legend.legend <<- c(Legend.legend, paste("CH:", 
-                        bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
-                    else Legend.legend <<- c(Legend.legend, paste("AB:", 
-                      bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
+                      "1") Legend.legend <<- c(Legend.legend, 
+                      paste("CH:", bpar$groups.label.text[Additional.ConvexHullAlphaBag.for])) else Legend.legend <<- c(Legend.legend, 
+                      paste("AB:", bpar$groups.label.text[Additional.ConvexHullAlphaBag.for]))
                     Legend.text.col <<- c(Legend.text.col, "black")
                     Legend.lty <<- c(Legend.lty, bpar$gConvexHullAlphaBag.lty[Additional.ConvexHullAlphaBag.for])
                     Legend.lwd <<- c(Legend.lwd, bpar$gConvexHullAlphaBag.lwd[Additional.ConvexHullAlphaBag.for])
@@ -8728,20 +8712,14 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         SettingsBox.transformation.func <<- switch(temp1, Centre = function(IN, 
             ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(Data[samples.in, variables.in])
-            if (!is.na(ARow)) 
-                IN - temp1
-            else if (!is.na(WhichCol)) 
-                IN - temp1[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) IN - temp1 else if (!is.na(WhichCol)) IN - 
+                temp1[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         }, `Centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(Data[samples.in, variables.in])
             temp2 <- apply(Data[samples.in, variables.in], 2, 
                 sd)
-            if (!is.na(ARow)) 
-                (IN - temp1)/temp2
-            else if (!is.na(WhichCol)) 
-                (IN - temp1[WhichCol])/temp2[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) (IN - temp1)/temp2 else if (!is.na(WhichCol)) (IN - 
+                temp1[WhichCol])/temp2[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         }, `Unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- apply(Data[samples.in, variables.in], 2, 
                 min)
@@ -8749,27 +8727,18 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 function(x) max(x) - min(x))
             temp3 <- colMeans(apply(Data[samples.in, variables.in], 
                 2, function(x) (x - min(x))/(max(x) - min(x))))
-            if (!is.na(ARow)) 
-                (IN - temp1)/temp2 - temp3
-            else if (!is.na(WhichCol)) 
-                (IN - temp1[WhichCol])/temp2[WhichCol] - temp3[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) (IN - temp1)/temp2 - temp3 else if (!is.na(WhichCol)) (IN - 
+                temp1[WhichCol])/temp2[WhichCol] - temp3[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         }, `Log, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(log(Data[samples.in, variables.in]))
-            if (!is.na(ARow)) 
-                log(IN) - temp1
-            else if (!is.na(WhichCol)) 
-                log(IN) - temp1[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) log(IN) - temp1 else if (!is.na(WhichCol)) log(IN) - 
+                temp1[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         }, `Log, centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- colMeans(log(Data[samples.in, variables.in]))
             temp2 <- apply(log(Data[samples.in, variables.in]), 
                 2, sd)
-            if (!is.na(ARow)) 
-                (log(IN) - temp1)/temp2
-            else if (!is.na(WhichCol)) 
-                (log(IN) - temp1[WhichCol])/temp2[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) (log(IN) - temp1)/temp2 else if (!is.na(WhichCol)) (log(IN) - 
+                temp1[WhichCol])/temp2[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         }, `Log, unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
             temp1 <- apply(log(Data[samples.in, variables.in]), 
                 2, min)
@@ -8777,30 +8746,20 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 2, function(x) max(x) - min(x))
             temp3 <- colMeans(apply(log(Data[samples.in, variables.in]), 
                 2, function(x) (x - min(x))/(max(x) - min(x))))
-            if (!is.na(ARow)) 
-                (log(IN) - temp1)/temp2 - temp3
-            else if (!is.na(WhichCol)) 
-                (log(IN) - temp1[WhichCol])/temp2[WhichCol] - 
-                  temp3[WhichCol]
-            else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
+            if (!is.na(ARow)) (log(IN) - temp1)/temp2 - temp3 else if (!is.na(WhichCol)) (log(IN) - 
+                temp1[WhichCol])/temp2[WhichCol] - temp3[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.transformation.func")
         })
         SettingsBox.BackTransformation.func <<- switch(temp1, 
             Centre = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- colMeans(Data[samples.in, variables.in])
-                if (!is.na(ARow)) 
-                  IN + temp1
-                else if (!is.na(WhichCol)) 
-                  IN + temp1[WhichCol]
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) IN + temp1 else if (!is.na(WhichCol)) IN + 
+                  temp1[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             }, `Centre, scale` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- colMeans(Data[samples.in, variables.in])
                 temp2 <- apply(Data[samples.in, variables.in], 
                   2, sd)
-                if (!is.na(ARow)) 
-                  IN * temp2 + temp1
-                else if (!is.na(WhichCol)) 
-                  IN * temp2[WhichCol] + temp1[WhichCol]
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) IN * temp2 + temp1 else if (!is.na(WhichCol)) IN * 
+                  temp2[WhichCol] + temp1[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             }, `Unitise, centre` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- apply(Data[samples.in, variables.in], 
                   2, min)
@@ -8808,29 +8767,19 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                   2, function(x) max(x) - min(x))
                 temp3 <- colMeans(apply(Data[samples.in, variables.in], 
                   2, function(x) (x - min(x))/(max(x) - min(x))))
-                if (!is.na(ARow)) 
-                  (IN + temp3) * temp2 + temp1
-                else if (!is.na(WhichCol)) 
-                  (IN + temp3[WhichCol]) * temp2[WhichCol] + 
-                    temp1[WhichCol]
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) (IN + temp3) * temp2 + temp1 else if (!is.na(WhichCol)) (IN + 
+                  temp3[WhichCol]) * temp2[WhichCol] + temp1[WhichCol] else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             }, `Log, centre` = function(IN, ARow = NA, WhichCol = NA) {
                 temp1 <- colMeans(log(Data[samples.in, variables.in]))
-                if (!is.na(ARow)) 
-                  exp(IN + temp1)
-                else if (!is.na(WhichCol)) 
-                  exp(IN + temp1[WhichCol])
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) exp(IN + temp1) else if (!is.na(WhichCol)) exp(IN + 
+                  temp1[WhichCol]) else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             }, `Log, centre, scale` = function(IN, ARow = NA, 
                 WhichCol = NA) {
                 temp1 <- colMeans(log(Data[samples.in, variables.in]))
                 temp2 <- apply(log(Data[samples.in, variables.in]), 
                   2, sd)
-                if (!is.na(ARow)) 
-                  exp(IN * temp2 + temp1)
-                else if (!is.na(WhichCol)) 
-                  exp(IN * temp2[WhichCol] + temp1[WhichCol])
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) exp(IN * temp2 + temp1) else if (!is.na(WhichCol)) exp(IN * 
+                  temp2[WhichCol] + temp1[WhichCol]) else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             }, `Log, unitise, centre` = function(IN, ARow = NA, 
                 WhichCol = NA) {
                 temp1 <- apply(log(Data[samples.in, variables.in]), 
@@ -8840,12 +8789,9 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 temp3 <- colMeans(apply(log(Data[samples.in, 
                   variables.in]), 2, function(x) (x - min(x))/(max(x) - 
                   min(x))))
-                if (!is.na(ARow)) 
-                  exp((IN + temp3) * temp2 + temp1)
-                else if (!is.na(WhichCol)) 
-                  exp((IN + temp3[WhichCol]) * temp2[WhichCol] + 
-                    temp1[WhichCol])
-                else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
+                if (!is.na(ARow)) exp((IN + temp3) * temp2 + 
+                  temp1) else if (!is.na(WhichCol)) exp((IN + 
+                  temp3[WhichCol]) * temp2[WhichCol] + temp1[WhichCol]) else stop("Specify either `ARow' or `WhichCol' in SettingsBox.BackTransformation.func")
             })
         temp2 <- function(temp3 = Data[samples.in, variables.in]) {
             temp4 <- scale(temp3, scale = FALSE)
@@ -8915,10 +8861,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     DiagnosticTabs.which <- NULL
     DiagnosticTabs.switch <- function() {
         switch(DiagnosticTabs.which, `1` = ConvergenceTab.plot(screen = FALSE), 
-            `2` = if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) 
-                PointsTab.plot.predictivities(screen = FALSE)
-            else if (tclvalue(Biplot.Axes.var) != "1") 
-                PointsTab.plot.ShepardDiagram(screen = FALSE), 
+            `2` = if (tclvalue(Biplot.Axes.var) %in% c("0", "2")) PointsTab.plot.predictivities(screen = FALSE) else if (tclvalue(Biplot.Axes.var) != 
+                "1") PointsTab.plot.ShepardDiagram(screen = FALSE), 
             `3` = GroupsTab.plot.predictivities(screen = FALSE), 
             `4` = AxesTab.plot.predictivities(screen = FALSE))
     }
@@ -9206,7 +9150,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 bg = bpar$DiagnosticTabs.ShepardDiagram.disparities.col.bg)
             nLargest <- bpar$DiagnosticTabs.ShepardDiagram.WorstFittingPointPairs
             if (nLargest > 0) {
-                temp0 <- rank(-abs(disp - dist), ties.method = "min")
+                temp0 <- rank(-abs(disp - dist), ties.method = "min")[1]
                 temp1 <- which(temp0 <= nLargest)
                 temp2 <- temp0[temp1]
                 nLargestRanks <- temp2[order(temp2)]
@@ -9486,7 +9430,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         ExportTab.data.name <<- NULL
         ExportTab.data.func <<- NULL
         tkconfigure(ExportTab.DisplayInConsole.but, state = "disabled")
-        tkconfigure(ExportTab.ExportToWorkspace.but, state = "disabled")
+        tkconfigure(ExportTab.ExportToFile.but, state = "disabled")
         ExportTab.data <<- c(ExportTab.data, list(General = c("X, the matrix of original data", 
             "Xtr, the matrix of transformed data")))
         ExportTab.data.name <<- c(ExportTab.data.name, list(c("General.X", 
@@ -10168,12 +10112,12 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 ExportTab.Nvalue <<- as.numeric(substr(ItemIdent, 
                   start = 4, stop = nchar(ItemIdent)))
                 tkconfigure(ExportTab.DisplayInConsole.but, state = "normal")
-                tkconfigure(ExportTab.ExportToWorkspace.but, 
+                tkconfigure(ExportTab.ExportToFile.but, 
                   state = "normal")
             }
             else {
                 tkconfigure(ExportTab.DisplayInConsole.but, state = "disabled")
-                tkconfigure(ExportTab.ExportToWorkspace.but, 
+                tkconfigure(ExportTab.ExportToFile.but, 
                   state = "disabled")
             }
         })
@@ -10185,13 +10129,17 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         print(ExportTab.data.func[[ExportTab.Rvalue]][[ExportTab.Nvalue]]())
         cat("\n")
     }
-    ExportTab.ExportToWorkspace.cmd <- function() {
-        assign(ExportTab.data.name[[ExportTab.Rvalue]][ExportTab.Nvalue], 
-            ExportTab.data.func[[ExportTab.Rvalue]][[ExportTab.Nvalue]](), 
-            envir = .GlobalEnv)
-        cat("\n", "Saved '", ExportTab.data[[ExportTab.Rvalue]][ExportTab.Nvalue], 
-            "' in the Workspace as `", ExportTab.data.name[[ExportTab.Rvalue]][ExportTab.Nvalue], 
-            "'.\n\n", sep = "")
+    ExportTab.ExportToFile.cmd <- function() {
+    	FileName <- tclvalue(tkgetSaveFile(filetypes = "{{txt files} {.txt}} {{All files} *}"))
+        if (nchar(FileName)) {
+            nn <- nchar(FileName)
+            if (nn < 5 || substr(FileName, nn - 3, nn) != ".txt") 
+                FileName <- paste(FileName, ".txt", sep = "")
+	 sink(FileName,append=FALSE)
+	 print(ExportTab.data.func[[ExportTab.Rvalue]][[ExportTab.Nvalue]]())
+	 sink()
+	 }
+	tkfocus(GUI.TopLevel)
     }
     DiagnosticTabs.nb <- tk2notebook(GUI.TopLevel, tabs = NULL)
     tkplace(DiagnosticTabs.nb, relx = 0.61, rely = 0.04, relwidth = 0.385, 
@@ -10866,13 +10814,13 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     tkplace(ExportTab.DisplayInConsole.but, relx = 0.24, rely = 0.92, 
         relwidth = 0.28, height = 22, `in` = DiagnosticTabs.Export, 
         anchor = "w")
-    ExportTab.ExportToWorkspace.but <- tk2button(DiagnosticTabs.Export, 
-        text = "Save to Workspace", command = function() {
+    ExportTab.ExportToFile.but <- tk2button(DiagnosticTabs.Export, 
+        text = "Save to File", command = function() {
             GUI.BindingsOff()
-            ExportTab.ExportToWorkspace.cmd()
+            ExportTab.ExportToFile.cmd()
             GUI.BindingsOn()
         })
-    tkplace(ExportTab.ExportToWorkspace.but, relx = 0.52, rely = 0.92, 
+    tkplace(ExportTab.ExportToFile.but, relx = 0.52, rely = 0.92, 
         relwidth = 0.28, height = 22, `in` = DiagnosticTabs.Export, 
         anchor = "w")
     Kraal.par <- NULL
@@ -11484,3 +11432,4 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     GUI.BindingsOn()
     invisible()
 }
+
