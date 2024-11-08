@@ -29,7 +29,7 @@ aircraft. \emph{Technical Report R-2249-AF}, RAND Corporation, Santa Monica, CA,
 }
 \references{
 Cook, R. D. and Weisberg, S. (1982). \emph{Residuals and influence in regression}. Monographs on Statistics and Applied Probability.
-              Chapman \& Hall, London, UK.
+              Chapman & Hall, London, UK.
 
 Gower, J. C. and Hand,  D.J. (1996). \emph{Biplots}. Monographs on Statistics and Applied Probability. Chapman & Hall, London, UK.
 }

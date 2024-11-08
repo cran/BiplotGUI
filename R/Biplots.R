@@ -716,7 +716,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     GUI.TopLevel <- tktoplevel()
     tkwm.title(GUI.TopLevel, "BiplotGUI")
     Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
-        "R.exe"), res = "R")
+                        "R.exe"), res = "R")
     tk2ico.set(GUI.TopLevel, Rico)
     tk2ico.destroy(Rico)
     rm(Rico)
@@ -1341,7 +1341,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Options")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -1466,7 +1467,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Title")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -2349,7 +2351,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "By group")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -2798,7 +2801,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Axes")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -3035,7 +3039,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkwm.deiconify(top)
         tkwm.title(top, "Interaction")
         tkgrab.set(top)
-        Rico <- tk2ico.load(res = "question")
+        Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                      "R.exe"), res = "R")
         tk2ico.set(top, Rico)
         tk2ico.destroy(Rico)
         rm(Rico)
@@ -3356,7 +3361,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         tkwm.deiconify(top)
         tkwm.title(top, "Diagnostic tabs")
         tkgrab.set(top)
-        Rico <- tk2ico.load(res = "question")
+        Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                      "R.exe"), res = "R")
         tk2ico.set(top, Rico)
         tk2ico.destroy(Rico)
         rm(Rico)
@@ -4026,7 +4032,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Monotone spline transformation")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                          "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5070,7 +5077,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
                 tkwm.deiconify(top_)
                 tkwm.title(top_, "Format")
                 tkgrab.set(top_)
-                Rico <- tk2ico.load(res = "question")
+                Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                              "R.exe"), res = "R")
                 tk2ico.set(top_, Rico)
                 tk2ico.destroy(Rico)
                 rm(Rico)
@@ -5138,7 +5146,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Interpolate a new sample")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                          "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5238,7 +5247,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Sample group means")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                          "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5361,7 +5371,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Convex hulls")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+          Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                              "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5498,7 +5509,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Alpha-bags")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5704,7 +5716,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Point densities")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -5834,7 +5847,8 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
             tkwm.deiconify(top)
             tkwm.title(top, "Classification regions")
             tkgrab.set(top)
-            Rico <- tk2ico.load(res = "question")
+            Rico <- tk2ico.load(file.path(Sys.getenv("R_HOME"), "bin", 
+                                "R.exe"), res = "R")
             tk2ico.set(top, Rico)
             tk2ico.destroy(Rico)
             rm(Rico)
@@ -8978,7 +8992,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
     DiagnosticTabs.ExternalWindow.cmd <- function() {
         if (boptions$ReuseExternalWindows && dev.cur() > 1) 
             graphics.off()
-        x11(width = boptions$ExternalGraphWidth, height = boptions$ExternalGraphHeight)
+        dev.new(width = boptions$ExternalGraphWidth, height = boptions$ExternalGraphHeight)
         DiagnosticTabs.switch()
     }
     ConvergenceTab.update <- FALSE
@@ -11302,7 +11316,7 @@ function (Data, groups = rep(1, nrow(Data)), PointLabels = rownames(Data),
         .Tcl("update")
         if (boptions$ReuseExternalWindows && dev.cur() > 1) 
             graphics.off()
-        x11(width = boptions$ExternalGraphWidth, height = boptions$ExternalGraphHeight)
+        dev.new(width = boptions$ExternalGraphWidth, height = boptions$ExternalGraphHeight)
         Biplot.plot(screen = FALSE)
         .Tcl("update")
     }

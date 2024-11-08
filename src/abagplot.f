@@ -7,17 +7,17 @@ C  This subroutine computes a alphabagplot for any bivariate data set.
 C
 C  There is a choice between computing all the whiskers (take whisk equal
 C  to 1), or few whiskers (only one whisker on each edge of the bag - take
-C  whisk equal to 2), or no whiskers (take whisk equal to 3), or star-shaped 
-C  whiskers (take whisk equal to 4). 
+C  whisk equal to 2), or no whiskers (take whisk equal to 3), or star-shaped
+C  whiskers (take whisk equal to 4).
 C  If the data set is not in general position, dithering is used.
 C  Some adaptations are made for small n, and for large n (take subsets).
 C  If all the points are (nearly) collinear, the bagplot reduces to the
-C  usual boxplot for univariate data. 
+C  usual boxplot for univariate data.
 C  In this case, boxplot is set equal to 1 or 2.
 C
 C  Version: 15 December 1999
 C
-  
+
       implicit integer(i-n), double precision(a-h,o-z)
       PARAMETER(MAXN=2500, MAXM=MAXN*(MAXN-1)/2, MAXNUM=500000)
       INTEGER NCIRQ(MAXN),MCIRQ(MAXN),NRANK(MAXN),F(MAXN)
@@ -31,9 +31,9 @@ C
       integer notingp,seed,starttel,a(maxn),ntot,nsub
       integer boxpl,whisk,dattm(maxn),numdattm,angi
       integer numk,numk1
-	integer alpha1
+      integer alpha1
       double precision X(N),Y(N),WX(MAXN),WY(MAXN),dpf(maxn)
-	double precision interpx(n*2), interpy(n*2)
+      double precision interpx(n*2), interpy(n*2)
       double precision ANGLE(MAXM),D(MAXM),alpha(maxnum)
       double precision beta(maxn),wx1(maxn),wy1(maxn)
       double precision angz(maxn),angy1(maxn),angy2(maxn)
@@ -48,11 +48,11 @@ C
       double precision zori(maxn,2),datatyp(n,3)
       double precision interpol(MAXN*2,2),pxpy(n,3)
       double precision datatyp2(n,2),xrand(maxn),yrand(2)
-
-
+C
+C
       data seed/256/
-
-	
+C
+C
       PI=DACOS(DBLE(-1.0))
       PI2=PI/2.0
       EPS=0.0000001
@@ -211,12 +211,12 @@ C
          if (ydev.gt.eps) y(i)=(y(i)-ymean)/ydev
          zori(i,1)=x(i)
          zori(i,2)=y(i)
-	 WX(I)=X(I)
-	 WY(I)=Y(I)
+      WX(I)=X(I)
+      WY(I)=Y(I)
          wx1(i)=x(i)
          wy1(i)=y(i)
-	 NCIRQ(I)=I
-	 MCIRQ(I)=I
+      NCIRQ(I)=I
+      MCIRQ(I)=I
  5    CONTINUE
 C
 C     If n is large, take a subset.
@@ -233,7 +233,7 @@ C
             wy(i)=y(i)
 41       continue
       endif
-C      
+C
 C     Test whether more than half of the points lie on a vertical line.
 C
       boxpl=0
@@ -274,7 +274,7 @@ C
             if (tel.gt.idnint(dble(n/2))+1) goto 46
          endif
          goto 42
-      endif 
+      endif
 46    continue
 C
 C     To test whether the data points are in general position,
@@ -311,31 +311,31 @@ C        The points NCIRQ(I), NCIRQ(J), and NCIRQ(L) lie on a vertical line.
             ENDIF
          ENDIF
       ENDIF
-C    
+C
 C     Compute all the angles formed by pairs of data points.
 C
 15    M=((N*(N-1))/2)
       L=1
       DO 20 I=1,N
-	 DO 25 J=I+1,N
-	    IF (X(I).EQ.X(J)) THEN
-	       ANGLE(L)=PI2
+      DO 25 J=I+1,N
+        IF (X(I).EQ.X(J)) THEN
+           ANGLE(L)=PI2
             ELSE
-	       ANGLE(L)=DATAN((Y(I)-Y(J))/(X(I)-X(J)))
-	       IF (ANGLE(L).LE.0.0) ANGLE(L)=ANGLE(L)+PI
+           ANGLE(L)=DATAN((Y(I)-Y(J))/(X(I)-X(J)))
+           IF (ANGLE(L).LE.0.0) ANGLE(L)=ANGLE(L)+PI
             ENDIF
-	    IND1(L)=I
-	    IND2(L)=J
-	    L=L+1
+        IND1(L)=I
+        IND2(L)=J
+        L=L+1
 25    CONTINUE
 20    CONTINUE
-C 
+C
 C     Sort all the angles and permute IND1 and IND2 in the same way.
 C     To avoid using several SORT-routines, we will always permute
 C     two integer arrays and one double precision array.
 C
       CALL BP_SORT(ANGLE,IND1,IND2,D,M,JLV,JRV)
-C     
+C
 C     If all points are collinear, use a univariate boxplot.
 C
       boxpl=0
@@ -370,7 +370,7 @@ C
             endif
          else
             ang=angle(i)
-            angi=i 
+            angi=i
             tel=1
          endif
 126   continue
@@ -393,34 +393,34 @@ C     All points collinear
          endif
          goto 610
       endif
-C 
+C
 C  Test whether any three points are collinear.
 C
       LEFT=1
 30    ANG1=ANGLE(LEFT)
       DO 35 J=LEFT+1,M
-	 IF (ANGLE(J).GT.ANG1) THEN
-	    LEFT=J
-	    GOTO 30
+      IF (ANGLE(J).GT.ANG1) THEN
+        LEFT=J
+        GOTO 30
          ELSE
             DO 36 I=LEFT,J-1
-               IF ((IND1(I).EQ.IND1(J)).or. 
-     +	          (IND1(I).EQ.IND2(J))) THEN 
+               IF ((IND1(I).EQ.IND1(J)).or.
+     +            (IND1(I).EQ.IND2(J))) THEN
 C	       The data are not in general position:
 C	       The points IND1(J), IND2(J), and IND2(I) are collinear.
-	       GOTO 210
-	       ENDIF
-	       IF ((IND2(I).EQ.IND1(J)).or.
+            GOTO 210
+           ENDIF
+           IF ((IND2(I).EQ.IND1(J)).or.
      +            (IND2(I).EQ.IND2(J))) THEN
 C	       The data are not in general position:
 C	       The points IND1(J), IND2(J), and IND1(I) are collinear.
-	       GOTO 210
-	       ENDIF
+           GOTO 210
+           ENDIF
 36          CONTINUE
          ENDIF
 35    CONTINUE
       goto 37
-
+C
 C
 C     If the data are not in general position, use dithering.
 C
@@ -436,10 +436,10 @@ C
          y(i)=wy(i)
 211   continue
       goto 1
-
+C
 C
 C      The data are in general position.
-C      
+C
 37    if (notingp.eq.1) then
       do 212 i=1,n
           numdep(i)=0
@@ -456,7 +456,7 @@ C
 38    continue
 C
 C     Calculation of the Tukey median.
-C     
+C
       tm=0
       xsum=0
       ysum=0
@@ -473,7 +473,7 @@ C
       if (xdev.gt.eps) tukm(1)=tukm(1)*xdev+xmean
          tukm(2)=ysum/n
       if (ydev.gt.eps) tukm(2)=tukm(2)*ydev+ymean
-         goto 800 
+         goto 800
       endif
       empty=0
       ib=kstar
@@ -495,7 +495,7 @@ C
      +  KAND1,KAND2,ALPHA,IND1,IND2,NCIRQ,MCIRQ,ANGLE,KORNR,L,
      +  JRV,JLV,DPF,NUM,ib,EMPTY)
 C
-C     Scan KORNR and compute coordinates of the vertices. 
+C     Scan KORNR and compute coordinates of the vertices.
 C
 186   KOUNT=0
       I=1
@@ -521,16 +521,16 @@ C
       ycordp=ycord
       KOUNT=KOUNT+1
       I=I+1
-      if (num.eq.1) goto 195 
+      if (num.eq.1) goto 195
 190   IF ((KORNR(I,1).EQ.KORNR(I-1,1)).AND.(KORNR(I,2).EQ.KORNR(I-1,2))
      +.AND.(KORNR(I,3).EQ.KORNR(I-1,3).AND.KORNR(I,4).EQ.KORNR(I-1,4)))
      +THEN
-	I=I+1
+      I=I+1
       ELSE
         IF ((KORNR(I,1).EQ.KORNR(1,1)).AND.(KORNR(I,2).EQ.KORNR(1,2))
-     +    .AND.(KORNR(I,3).EQ.KORNR(1,3).AND.KORNR(I,4).EQ.KORNR(1,4))) 
-     +	THEN
-	  GOTO 195
+     +    .AND.(KORNR(I,3).EQ.KORNR(1,3).AND.KORNR(I,4).EQ.KORNR(1,4)))
+     +  THEN
+        GOTO 195
         ELSE
           E1=Y(KORNR(I,2))-Y(KORNR(I,1))
           F1=X(KORNR(I,1))-X(KORNR(I,2))
@@ -543,7 +543,7 @@ C
           XCORD=(-F2*G1+F1*G2)/(E2*F1-E1*F2)
           YCORD=(-E2*G1+E1*G2)/(E1*F2-E2*F1)
           if (((dabs(xcord-xcordp).lt.eps).and.
-     +        (dabs(ycord-ycordp).lt.eps)).or. 
+     +        (dabs(ycord-ycordp).lt.eps)).or.
      +       ((dabs(xcord-xcord1).lt.eps).and.
      +        (dabs(ycord-ycord1).lt.eps))) then
              i=i+1
@@ -555,18 +555,18 @@ C
       if (tm.eq.0) then
              xsum=xsum+xcord
              ysum=ysum+ycord
-      endif
-	  KOUNT=KOUNT+1
-	  I=I+1
+       endif
+      KOUNT=KOUNT+1
+      I=I+1
           endif
         ENDIF
       ENDIF
       IF (I.NE.(NUM+1)) GOTO 190
 195   if (tm.eq.2) goto 500
       if (tm.eq.1) goto 300
-c    
+c
 c     Calculation of the center of gravity.
-c     
+c
       if (tm.eq.0) then
          if (kount.gt.1) then
          do 205 i=1,kount
@@ -579,15 +579,15 @@ c
          do 206 i=1,kount-1
          sum=sum+dabs(wx(i)*wy(i+1)-wx(i+1)*wy(i))
          tukmed(1)=tukmed(1)+
-     +  ((wx(i)+wx(i+1))*dabs(wx(i)*wy(i+1)-wx(i+1)*wy(i)))   
+     +  ((wx(i)+wx(i+1))*dabs(wx(i)*wy(i+1)-wx(i+1)*wy(i)))
          tukmed(2)=tukmed(2)+
-     +  ((wy(i)+wy(i+1))*dabs(wx(i)*wy(i+1)-wx(i+1)*wy(i)))   
+     +  ((wy(i)+wy(i+1))*dabs(wx(i)*wy(i+1)-wx(i+1)*wy(i)))
 206      continue
          sum=sum+dabs(wx(kount)*wy(1)-wx(1)*wy(kount))
          tukmed(1)=tukmed(1)+
-     +  ((wx(kount)+wx(1))*dabs(wx(kount)*wy(1)-wx(1)*wy(kount)))   
+     +  ((wx(kount)+wx(1))*dabs(wx(kount)*wy(1)-wx(1)*wy(kount)))
          tukmed(2)=tukmed(2)+
-     +  ((wy(kount)+wy(1))*dabs(wx(kount)*wy(1)-wx(1)*wy(kount)))   
+     +  ((wy(kount)+wy(1))*dabs(wx(kount)*wy(1)-wx(1)*wy(kount)))
          tukmed(1)=(tukmed(1)/(3*sum))+(xsum/kount)
          tukmed(2)=(tukmed(2)/(3*sum))+(ysum/kount)
          else
@@ -610,13 +610,13 @@ c
       tm=1
       if (nointer.eq.1) goto 800
 C
-C     Calculation of correct value of k. 
+C     Calculation of correct value of k.
 C
       nc=int(n*alpha1/100)
       j=kstar+1
 200   j=j-1
       if (numdep(kstar).le.nc) then
-         numdep(kstar)=numdep(kstar)+numdep(j-1) 
+         numdep(kstar)=numdep(kstar)+numdep(j-1)
          goto 200
       endif
       k=j+1
@@ -638,7 +638,7 @@ C
 201   continue
 C
 C     Calculation of the vertices of Dk-1.
-C 
+C
       tm=2
       CALL BP_ISODEPTH(N,M,X,Y,MAXN,MAXM,MAXNUM,NRANK,D,F,BETA,
      +  KAND1,KAND2,ALPHA,IND1,IND2,NCIRQ,MCIRQ,ANGLE,KORNR,L,
@@ -647,7 +647,7 @@ C
 500   continue
 C
 C     If Dk-1 is a line segment, use a univariate boxplot.
-C 
+C
       if (dabs(wx(2)-wx(1)).gt.eps) then
          hulp=(wy(2)-wy(1))/(wx(2)-wx(1))
          do 506 i=3,kount
@@ -660,7 +660,7 @@ C
          if (dabs(wx(i)-wx(1)).gt.eps*10) goto 505
 504      continue
          boxpl=2
-         goto 509  
+         goto 509
       endif
 509   continue
       do 507 i=1,n
@@ -704,7 +704,7 @@ C
       else
       dist=dsqrt(x(i)*x(i)+y(i)*y(i))
       xcord=x(i)/dist
-      ycord=y(i)/dist 
+      ycord=y(i)/dist
       if (dabs(xcord).gt.dabs(ycord)) then
          if (xcord.ge.0.0) then
             angz(i)=dasin(ycord)
@@ -737,7 +737,7 @@ C
       dist=dsqrt(wx1(i)*wx1(i)+wy1(i)*wy1(i))
       if (dist.gt.eps) then
       xcord=wx1(i)/dist
-      ycord=wy1(i)/dist 
+      ycord=wy1(i)/dist
       if (dabs(xcord).gt.dabs(ycord)) then
          if (xcord.ge.0.0) then
             angy1(i)=dasin(ycord)
@@ -766,7 +766,7 @@ C
       dist=dsqrt(wx(i)*wx(i)+wy(i)*wy(i))
       if (dist.gt.eps) then
       xcord=wx(i)/dist
-      ycord=wy(i)/dist 
+      ycord=wy(i)/dist
       if (dabs(xcord).gt.dabs(ycord)) then
          if (xcord.ge.0.0) then
             angy2(i)=dasin(ycord)
@@ -798,7 +798,7 @@ C
       ind(kount1+1)=ind(1)
       if (angz(1).lt.angy1(1)) j=kount1
       if (angz(1).ge.angy1(1)-eps) j=1
-      do 429 i=1,n  
+      do 429 i=1,n
 420   if ((angz(i).ge.angy1(j+1)-eps).and.(jk.eq.0)) then
          j=j+1
          if (j.eq.kount1) jk=1
@@ -834,7 +834,7 @@ C
       jnd(kount+1)=jnd(1)
       if (angz(1).lt.angy2(1)) j=kount
       if (angz(1).ge.angy2(1)-eps) j=1
-      do 529 i=1,n  
+      do 529 i=1,n
 520   if ((angz(i).ge.angy2(j+1)-eps).and.(jk.eq.0)) then
          j=j+1
          if (j.eq.kount) jk=1
@@ -957,7 +957,7 @@ C
       if (i.le.kount1+kount) goto 600
 C
 C     Interpolation of two arrays px and py.
-C      
+C
 602      c=3.0
        if (nointer.eq.1) then
           kount1=0
@@ -977,11 +977,11 @@ C
        else
           ycord=wy(i)+tukmed(2)
        endif
-   
+C
        interpol(i,1)=xcord
-       interpol(i,2)=ycord 
-	  interpx(i) = xcord
-	  interpy(i) = ycord
+       interpol(i,2)=ycord
+       interpx(i) = xcord
+       interpy(i) = ycord
 605    continue
        if (nointer.eq.1) then
 C      No interpolation, too many points coincide.
@@ -1046,7 +1046,7 @@ C
       else
       dist=dsqrt(x(i)*x(i)+y(i)*y(i))
       xcord=x(i)/dist
-      ycord=y(i)/dist 
+      ycord=y(i)/dist
       if (dabs(xcord).gt.dabs(ycord)) then
          if (xcord.ge.0.0) then
             angz(i)=dasin(ycord)
@@ -1078,7 +1078,7 @@ C
       gamma(kount+kount1+1)=gamma(1)
       if (angz(1).lt.gamma(1)) j=kount+kount1
       if (angz(1).ge.gamma(1)-eps) j=1
-      do 1529 i=1,n  
+      do 1529 i=1,n
 1520   if ((angz(i).ge.gamma(j+1)-eps).and.(jk.eq.0)) then
          j=j+1
          if (j.eq.kount+kount1) jk=1
@@ -1162,7 +1162,7 @@ c        indoutl(i)=index(i)
            datatyp(i,1)=xcord
            datatyp(i,2)=ycord
            datatyp(i,3)=dble(typ(i))
-1639       continue 
+1639       continue
        if (numdattm.ne.0) then
              num=num+numdattm
        do 1644 i=1,numdattm
@@ -1207,7 +1207,7 @@ c        indoutl(i)=index(i)
       if (whisk.eq.3) goto 610
 C
 C     Retain only one whisker for each edge.
-C    
+C
 1641  if (ntot.gt.1000) then
         n=500
         call bp_rdraw(a,ntot,seed,n)
@@ -1332,7 +1332,7 @@ C660   continue
 C      do 661 i=1,start
 C         angz(i)=angz(i)-(pi*2)
 C661   continue
-C 
+C
 C     Calculation of star-shaped whiskers.
 C
       if (ntot.gt.nsub) goto 800
@@ -1429,7 +1429,7 @@ C
       endif
 720   IF (DSIN(ang)*wx(tel)-DCOS(ang)*wy(tel)
      +    .le.dsin(ang)*star(j,1)-dcos(ang)*star(j,2)) THEN
-         if ((ii.eq.start).and.(tel.eq.starttel)) 
+         if ((ii.eq.start).and.(tel.eq.starttel))
      +         gamma(tel+1)=gamma(tel+1)+(2*pi)
          if ((angz(ii).ge.gamma(tel+1))) then
             tel=tel+1
@@ -1505,11 +1505,11 @@ C
 801   continue
       endif
 800   continue
-610   num=kount1+kount   
-
-	
+610   num=kount1+kount
+C
+C
       END
-      
+
       INTEGER FUNCTION NBP_NCEIL(M,J)
       IF (MOD(M,J).EQ.0) THEN
          NBP_NCEIL=INT(dble(M)/J)
@@ -1544,14 +1544,14 @@ C
       EPS=0.0000001
       empty=0
 C
-C   (Re)initialize NCIRQ and NRANK.
+C     (Re)initialize NCIRQ and NRANK.
 C
       DO 45 I=1,N
-	 NCIRQ(I)=MCIRQ(I)
+      NCIRQ(I)=MCIRQ(I)
 45    CONTINUE
       DO 50 I=1,N
-	 IV=NCIRQ(I)
-	 NRANK(IV)=I
+      IV=NCIRQ(I)
+      NRANK(IV)=I
  50   CONTINUE
 C
 C  Let the line rotate from zero to ANGLE(1).
@@ -1560,27 +1560,27 @@ C
       HALT=0
       if (angle(1).gt.pi2) then
          l=1
-	 CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
-     +	                  K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
+      CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
+     +     K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
          halt=1
       endif
       L=2
  60   KONTROL=0
       IF ((PI.LE.(ANGLE(L)+PI2)).AND.((ANGLE(L)-PI2).LT.ANGLE(1))) THEN
-	 CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
-     +	                  K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
-	 KONTROL=1
+      CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
+     +     K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
+      KONTROL=1
       ENDIF
       L=L+1
       IF (KONTROL.EQ.1) HALT=1
       IF ((L.EQ.M+1).AND.(KONTROL.EQ.1)) THEN
-	 JFLAG=1
-	 GOTO 79
+      JFLAG=1
+      GOTO 79
       ENDIF
       IF (((HALT.EQ.1).AND.(KONTROL.EQ.0)).OR.(L.EQ.M+1)) THEN
-	 GOTO 70
+      GOTO 70
       ELSE
-	 GOTO 60
+      GOTO 60
       ENDIF
  70   if (l.gt.1) then
          JFLAG=L-1
@@ -1593,17 +1593,17 @@ C  In case the first switch didn't occur between zero and ANGLE(1),
 C  look for it between the following angles.
 C
       IF ((L.EQ.M+1).AND.(KONTROL.EQ.0)) THEN
-	 HALT=0
+      HALT=0
          halt2=0
  73      J=J+1
          if (j.eq.m+1) j=1
-	 L=J+1
+      L=J+1
          if (l.eq.m+1) l=1
  75      KONTROL=0
-	 IF ((ANGLE(L)+PI2).LT.PI) THEN
-	    ANG1=ANGLE(L)+PI2
+      IF ((ANGLE(L)+PI2).LT.PI) THEN
+         ANG1=ANGLE(L)+PI2
          ELSE
-	    ANG1=ANGLE(L)-PI2
+         ANG1=ANGLE(L)-PI2
          ENDIF
          if (j.eq.m) then
             jj=1
@@ -1611,33 +1611,33 @@ C
          else
             jj=j+1
          endif
-	 IF ((ANGLE(J).LE.ANG1).AND.(ANG1.LT.ANGLE(jj))) THEN
+      IF ((ANGLE(J).LE.ANG1).AND.(ANG1.LT.ANGLE(jj))) THEN
             if (angle(1).gt.pi) angle(1)=angle(1)-pi
-	    CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
+            CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,ANGLE,
      +                       K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
-	    KONTROL=1
+         KONTROL=1
          ENDIF
          if (angle(1).gt.pi) angle(1)=angle(1)-pi
-	 IF (L.NE.M) THEN
-	    L=L+1
+         IF (L.NE.M) THEN
+         L=L+1
          ELSE
-	    L=1
+         L=1
          ENDIF
-	 IF (KONTROL.EQ.1) HALT=1
-	 IF ((HALT.EQ.1).AND.(KONTROL.EQ.0)) THEN
+      IF (KONTROL.EQ.1) HALT=1
+      IF ((HALT.EQ.1).AND.(KONTROL.EQ.0)) THEN
             if (halt2.eq.1) goto 101
             if (l.gt.1) then
                jflag=l-1
             else
                jflag=m
             endif
-	    GOTO 79
+         GOTO 79
          ELSE
             IF (L.EQ.jj) THEN
                if (jj.eq.1) halt2=1
                GOTO 73
             ELSE
-	       GOTO 75
+            GOTO 75
             ENDIF
          ENDIF
       ENDIF
@@ -1646,27 +1646,27 @@ C  The first switch has occurred. Now start looking for the next ones,
 C  between the following angles.
 C
 79    DO 80 I=J+1,M-1
-	 L=JFLAG
+      L=JFLAG
  90      KONTROL=0
-	 IF ((ANGLE(L)+PI2).LT.PI) THEN
-	    ANG1=ANGLE(L)+PI2
+      IF ((ANGLE(L)+PI2).LT.PI) THEN
+         ANG1=ANGLE(L)+PI2
          ELSE
-	    ANG1=ANGLE(L)-PI2
+         ANG1=ANGLE(L)-PI2
          ENDIF
-	 IF ((ANGLE(I).LE.ANG1).AND.(ANG1.LT.ANGLE(I+1))) THEN
-	    CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,
+      IF ((ANGLE(I).LE.ANG1).AND.(ANG1.LT.ANGLE(I+1))) THEN
+         CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,
      +                  ANGLE,K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
-	    KONTROL=1
+         KONTROL=1
          ENDIF
-	 IF (KONTROL.EQ.0) THEN
-	    JFLAG=L
+      IF (KONTROL.EQ.0) THEN
+         JFLAG=L
          ELSE
-	    IF (L.NE.M) THEN
-	       L=L+1
+         IF (L.NE.M) THEN
+           L=L+1
             ELSE
-	       L=1
+           L=1
             ENDIF
-	    GOTO 90
+         GOTO 90
          ENDIF
  80   CONTINUE
       L=JFLAG
@@ -1675,26 +1675,26 @@ C  Finally, look for necessary switches between the last angle and zero.
 C
 100   KONTROL=0
       IF ((ANGLE(L)+PI2).LT.PI) THEN
-	 ANG1=ANGLE(L)+PI2
+      ANG1=ANGLE(L)+PI2
       ELSE
-	 ANG1=ANGLE(L)-PI2
+      ANG1=ANGLE(L)-PI2
       ENDIF
       IF ((ANGLE(M).LE.ANG1).AND.(ANG1.LT.PI)) THEN
-	 CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,
+      CALL BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,ALPHA,
      +               ANGLE,K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
-	 KONTROL=1
+      KONTROL=1
       ENDIF
       IF (KONTROL.EQ.1) THEN
          IF (L.NE.M) THEN
-	     L=L+1
+         L=L+1
          ELSE
 	     L=1
          ENDIF
          GOTO 100
-      ENDIF 
+      ENDIF
 101      NUM=KOUNT-1
-C  
-C  Sort the NUM special k-dividers. 
+C
+C  Sort the NUM special k-dividers.
 C  Permute KAND1, KAND2 and D in the same way.
 C
       CALL BP_SORT(ALPHA,KAND1,KAND2,D,NUM,JLV,JRV)
@@ -1710,9 +1710,9 @@ C  Compute the intersection point.
 C
       IF (DABS(-DSIN(ALPHA(IW2))*DCOS(ALPHA(IW1))
      +         +DSIN(ALPHA(IW1))*DCOS(ALPHA(IW2))).LT.EPS) THEN
-	 IW2=IW2+1
-	 IF (IW2.EQ.NUM+1) IW2=1
-	 GOTO 120
+      IW2=IW2+1
+      IF (IW2.EQ.NUM+1) IW2=1
+      GOTO 120
       ENDIF
       XCORD=(DCOS(ALPHA(IW2))*D(IW1)-DCOS(ALPHA(IW1))*D(IW2))
      + /(-DSIN(ALPHA(IW2))*DCOS(ALPHA(IW1))
@@ -1720,8 +1720,8 @@ C
       YCORD=(-DSIN(ALPHA(IW2))*D(IW1)+DSIN(ALPHA(IW1))*D(IW2))
      + /(-DSIN(ALPHA(IW1))*DCOS(ALPHA(IW2))
      +                   +DSIN(ALPHA(IW2))*DCOS(ALPHA(IW1)))
-C 
-C  Test whether the intersection point is a data point. 
+C
+C  Test whether the intersection point is a data point.
 C  If so, adjust IW1 and IW2.
 C
       IF ((KAND1(IW1).EQ.KAND1(IW2)).OR.(KAND1(IW1).EQ.KAND2(IW2)))
@@ -1757,14 +1757,14 @@ C
       if (kon.eq.iw1) kon=kon+1
       if (kon.eq.num+1) kon=1
 C
-C  Test whether the intersection point lies to the left of the special 
+C  Test whether the intersection point lies to the left of the special
 C  k-divider which corresponds to ALPHA(KON). If so, compute its depth.
 C
       IF ((DSIN(ALPHA(KON))*XCORD-DCOS(ALPHA(KON))*YCORD
      +     -D(KON)).le.eps) THEN
-         
+
          CALL BP_DEPTH(XCORD,YCORD,N,X,Y,BETA,F,DPF,JLV,JRV,HDEP1)
-         
+
          IF (HDEP1.EQ.K) NDK=1
          IF (HDEP1.NE.K) THEN
          CALL BP_DEPTH(XCORD-EPS*10,YCORD-EPS*10,N,X,Y,BETA,F,DPF,
@@ -1777,14 +1777,14 @@ C
      +        JLV,JRV,HDEP5)
          IF ((NDK.EQ.0).AND.
      +        ((HDEP1.ge.K).OR.(HDEP2.ge.K).OR.(HDEP3.ge.K)
-     +        .OR.(HDEP4.ge.K).OR.(HDEP5.ge.K))) THEN 
+     +        .OR.(HDEP4.ge.K).OR.(HDEP5.ge.K))) THEN
             NDK=1
          ENDIF
          IF ((HDEP1.LT.K).AND.(HDEP2.LT.K)
      +        .AND.(HDEP3.LT.K).AND.(HDEP4.LT.K)
      +        .AND.(HDEP5.LT.K).AND.(NDK.EQ.1)) THEN
-C     
-C  The intersection point is not the correct one, 
+C
+C  The intersection point is not the correct one,
 C  try the next special k-divider.
 C
             IW2=IW2+1
@@ -1793,7 +1793,7 @@ C
          ENDIF
       ENDIF
 C
-C  Store IW1 and IW2 in KORNR. If KORNR has already been filled, check whether 
+C  Store IW1 and IW2 in KORNR. If KORNR has already been filled, check whether
 C  we have encountered this intersection point before.
 C
       IF ((IW2.GT.IW1).AND.(JFULL.EQ.0)) THEN
@@ -1811,7 +1811,7 @@ C
      +              (KORNR(I,3).EQ.KAND1(IW2)).AND.
      +              (KORNR(I,4).EQ.KAND2(IW2)))
      +              THEN
-		  GOTO 170
+           GOTO 170
                ELSE
                   tel=tel+1
                   if (tel.gt.num*num) then
@@ -1832,11 +1832,11 @@ C
      +                 (dabs(ycord1-ycord).le.eps)) then
                      goto 170
                   endif
-                  
-		  KORNR(I,1)=KAND1(IW1)
-		  KORNR(I,2)=KAND2(IW1)
-		  KORNR(I,3)=KAND1(IW2)
-		  KORNR(I,4)=KAND2(IW2)
+C
+            KORNR(I,1)=KAND1(IW1)
+            KORNR(I,2)=KAND2(IW1)
+            KORNR(I,3)=KAND1(IW2)
+            KORNR(I,4)=KAND2(IW2)
                ENDIF
  140        CONTINUE
          ELSE
@@ -1853,7 +1853,7 @@ C
      +              (KORNR(I,3).EQ.KAND1(IW2)).AND.
      +              (KORNR(I,4).EQ.KAND2(IW2)))
      +              THEN
-		  GOTO 170
+            GOTO 170
                ELSE
                   tel=tel+1
                   if (tel.gt.num*num) then
@@ -1874,23 +1874,23 @@ C
      +                 (dabs(ycord1-ycord).le.eps)) then
                      goto 170
                   endif
-                  
-		  KORNR(I,1)=KAND1(IW1)
-		  KORNR(I,2)=KAND2(IW1)
-		  KORNR(I,3)=KAND1(IW2)
-		  KORNR(I,4)=KAND2(IW2)
+C
+            KORNR(I,1)=KAND1(IW1)
+            KORNR(I,2)=KAND2(IW1)
+            KORNR(I,3)=KAND1(IW2)
+            KORNR(I,4)=KAND2(IW2)
                ENDIF
  160        CONTINUE
          ENDIF
       ENDIF
       ELSE
-C     
-C  The intersection point is not the correct one, 
+C
+C  The intersection point is not the correct one,
 C  try the next special k-divider.
 C
-	 IW2=IW2+1
-	 IF (IW2.EQ.(NUM+1)) IW2=1
-	 GOTO 120
+      IW2=IW2+1
+      IF (IW2.EQ.(NUM+1)) IW2=1
+      GOTO 120
       ENDIF
 C
 C  Look for the next vertex of the convex figure.
@@ -1905,7 +1905,7 @@ C
 
       SUBROUTINE BP_SORT(B,I1,I2,R,N,JLV,JRV)
 C
-C  Sorts a double precision  array B of length N and permutes two integer 
+C  Sorts a double precision  array B of length N and permutes two integer
 C  arrays I1 and I2 and one double precision array R in the same way.
 C
       INTEGER N,I1(N),I2(N),H1,H2
@@ -1932,7 +1932,7 @@ C
       AMM=B(JNC)
       H1=I1(JNC)
       H2=I2(JNC)
-      H3=R(JNC) 
+      H3=R(JNC)
       B(JNC)=B(J)
       I1(JNC)=I1(J)
       I2(JNC)=I2(J)
@@ -1966,7 +1966,7 @@ C
       SUBROUTINE BP_ADJUST(IND1,IND2,L,NRANK,NCIRQ,KOUNT,
      +           ALPHA,ANGLE,K,N,M,MAXNUM,KAND1,KAND2,D,X,Y)
 C
-C  Updates NCIRQ and NRANK, detects the special k-dividers and stores 
+C  Updates NCIRQ and NRANK, detects the special k-dividers and stores
 C  their angles and the constant terms of their equations.
 C
       INTEGER NCIRQ(N),NRANK(N),IND1(M),IND2(M)
@@ -1986,34 +1986,34 @@ C
       IV=IV1
       NRANK(D1)=IV2
       NRANK(D2)=IV
-	 IF (((IV1.EQ.K).AND.(IV2.EQ.(K+1)))
+      IF (((IV1.EQ.K).AND.(IV2.EQ.(K+1)))
      +      .OR.((IV2.EQ.K).AND.(IV1.EQ.(K+1)))
-     +      .OR.((IV1.EQ.(N-K)).AND.(IV2.EQ.(N-K+1))) 
+     +      .OR.((IV1.EQ.(N-K)).AND.(IV2.EQ.(N-K+1)))
      +      .OR.((IV2.EQ.(N-K)).AND.(IV1.EQ.(N-K+1)))) THEN
-	    IF (ANGLE(L).LT.PI2) THEN
-	       DUM=ANGLE(L)+PI2
+        IF (ANGLE(L).LT.PI2) THEN
+            DUM=ANGLE(L)+PI2
             ELSE
-	       DUM=ANGLE(L)-PI2
+            DUM=ANGLE(L)-PI2
             ENDIF
             IF (((IV1.EQ.K).AND.(IV2.EQ.(K+1)))
      +         .OR.((IV2.EQ.K).AND.(IV1.EQ.(K+1)))) THEN
-	       IF (DUM.LE.PI2) THEN
-		  ALPHA(KOUNT)=ANGLE(L)+PI
+            IF (DUM.LE.PI2) THEN
+            ALPHA(KOUNT)=ANGLE(L)+PI
                ELSE
-		  ALPHA(KOUNT)=ANGLE(L)
+               ALPHA(KOUNT)=ANGLE(L)
                ENDIF
             ENDIF
-	    IF (((IV1.EQ.(N-K)).AND.(IV2.EQ.(N-K+1)))
+           IF (((IV1.EQ.(N-K)).AND.(IV2.EQ.(N-K+1)))
      +        .OR.((IV2.EQ.(N-K)).AND.(IV1.EQ.(N-K+1)))) THEN
-	       IF (DUM.LE.PI2) THEN
-		  ALPHA(KOUNT)=ANGLE(L)
+           IF (DUM.LE.PI2) THEN
+           ALPHA(KOUNT)=ANGLE(L)
                ELSE
-		  ALPHA(KOUNT)=ANGLE(L)+PI
+           ALPHA(KOUNT)=ANGLE(L)+PI
                ENDIF
             ENDIF
-	    KAND1(KOUNT)=IND1(L)
-	    KAND2(KOUNT)=IND2(L)
-	    D(KOUNT)=DSIN(ALPHA(KOUNT))*X(IND1(L))
+            KAND1(KOUNT)=IND1(L)
+            KAND2(KOUNT)=IND2(L)
+            D(KOUNT)=DSIN(ALPHA(KOUNT))*X(IND1(L))
      +                -DCOS(ALPHA(KOUNT))*Y(IND1(L))
             KOUNT=KOUNT+1
          ENDIF
@@ -2025,7 +2025,7 @@ C
       SUBROUTINE BP_DEPTH(U,V,N,X,Y,BETA,F,DPF,JLV,JRV,HDEP)
 C
 C  Computes the halfspace depth of a point. This subroutine was described
-C  in: Rousseeuw, P.J. and Ruts, I. (1996). Algorithm AS 307: Bivariate 
+C  in: Rousseeuw, P.J. and Ruts, I. (1996). Algorithm AS 307: Bivariate
 C  location depth. Applied Statistics (JRSS-C) 45, 516-526.
 C
       double precision U,V,BETA(N),X(N),Y(N),DPF(N)
@@ -2183,36 +2183,36 @@ C     the selected case numbers are uniformly distributed from 1 to ntot.
 C	  Where bp_uniran(1, ...) has been changed to bp_uniran(2, ...)
 C     and	int(urand*... to int(urand(1)*...
 
-	integer a(n)
-	integer seed,nrand
-        double precision urand(2)
-	jndex=0
-	do 20 m=1,n
+      integer a(n)
+      integer seed,nrand
+      double precision urand(2)
+      jndex=0
+      do 20 m=1,n
           call bp_uniran(2,seed,urand)
-	  nrand=int(urand(2)*(ntot-jndex))+1 
-	  jndex=jndex+1
-	  if(jndex.eq.1) then
-	    a(jndex)=nrand
-	  else
-	    a(jndex)=nrand+jndex-1
-	    do 5 i=1,jndex-1
-	      if(a(i).gt.nrand+i-1) then
-	        do 6 j=jndex,i+1,-1
-	          a(j)=a(j-1)
- 6              continue
-	        a(i)=nrand+i-1
-	        goto 20
-	      endif
+        nrand=int(urand(2)*(ntot-jndex))+1
+        jndex=jndex+1
+        if(jndex.eq.1) then
+        a(jndex)=nrand
+        else
+        a(jndex)=nrand+jndex-1
+        do 5 i=1,jndex-1
+          if(a(i).gt.nrand+i-1) then
+          do 6 j=jndex,i+1,-1
+              a(j)=a(j-1)
+ 6            continue
+            a(i)=nrand+i-1
+            goto 20
+          endif
  5          continue
-	  endif
+      endif
  20     continue
-	return
-	end
+      return
+      end
 
       subroutine nbp_norrandp(n,iseed,xrand)
 C
 C     This subroutine generates a random sample of size n
-C     from the normal (Gaussian) distribution with mean = 0 and 
+C     from the normal (Gaussian) distribution with mean = 0 and
 C     standard deviation = 1.
 C     The generated random sample will be placed in the vector xrand.
 C
@@ -2222,8 +2222,9 @@ C
 C     Generate n uniform (0,1) random numbers;
 C     then generate 2 additional uniform (0,1) random numbers.
 C
-      ipr=6
       data pi/3.14159265359/
+      ipr=6
+
       call bp_uniran(n,iseed,xrand)
       call bp_uniran(2,iseed,yrand)
 C
@@ -2250,20 +2251,22 @@ C
 
       subroutine bp_uniran(n,iseed,xrand)
 C
-C     This subroutine generates a random sample of size n from the 
+C     This subroutine generates a random sample of size n from the
 C     uniform (rectangular) distribution on the unit interval (0,1).
 C     The generated random sample will be placed in the vector xrand.
 C
       double precision xrand(n)
       integer M(17)
       save i,j,m,m1,m2
+
       DATA M(1),M(2),M(3),M(4),M(5),M(6),M(7),M(8),M(9),M(10),M(11),
      1     M(12),M(13),M(14),M(15),M(16),M(17)
      1/    30788,23052,2053,19346,10646,19427,23975,
      1     19049,10949,19693,29746,26748,2796,23890,
-     1     29168,31924,16499/ 
-      DATA M1,M2,I,J / 32767,256,5,17 / 
+     1     29168,31924,16499/
+      DATA M1,M2,I,J / 32767,256,5,17/
       IPR=6
+C
       IF (ISEED.LE.0) GOTO 9290
       MDIG=32
       M1=2**(MDIG-2)+(2**(MDIG-2)-1)
@@ -2279,13 +2282,13 @@ C
       ISEED3=J0*K0
       J1=MOD(ISEED3/M2+J0*K1+J1*K0,M2/2)
       J0=MOD(ISEED3,M2)
-      M(I)=J0+M2*J1 
+      M(I)=J0+M2*J1
 9200  CONTINUE
-      I=5 
+      I=5
       J=17
 9290  CONTINUE
 C
-C     Generate the n random numbers.  
+C     Generate the n random numbers.
 C
       DO 9300 L=1,N
       K=M(I)-M(J)
@@ -2302,5 +2305,5 @@ C
       ISEED=(-1)
 9000  CONTINUE
       RETURN
-      END 
+      END
 

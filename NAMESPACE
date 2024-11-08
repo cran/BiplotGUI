@@ -1,7 +1,46 @@
-useDynLib(BiplotGUI)
+exportPattern("^[^\\.]")
+useDynLib(BiplotGUI, .registration = TRUE)
+importFrom("colorspace", "heat_hcl", "sequential_hcl", "terrain_hcl")
+importFrom("KernSmooth", "bkde2D")
+importFrom("MASS", "ginv")
+importFrom("grDevices", "as.graphicsAnnot", "bmp", "chull", "col2rgb",
+             "dev.cur", "dev.new", "dev.off", "graphics.off", "hcl", "jpeg", "pdf",
+             "pictex", "png", "postscript", "rgb", "win.metafile",
+             "win.print", "x11", "xy.coords")
+importFrom("graphics", "axTicks", "axis", "box", "image", "layout",
+             "legend", "lines", "mtext", "par", "plot.window", "points",
+             "polygon", "rect", "segments", "strheight", "strwidth",
+             "symbols", "text", "title", "xinch", "yinch")
+importFrom("stats", "cov", "dist", "quantile", "runif", "sd")
+importFrom("rgl", "aspect3d", "light3d", "lines3d", "par3d", "points3d", "segments3d",
+           "rgl.bg", "rgl.clear", "rgl.light", "rgl.open",
+           "rgl.viewpoint", "text3d", "title3d")
+importFrom("tcltk", ".Tcl", "tcl", "tclArray",  "tclRequire", "tclVar", "tclvalue",
+           "tkadd", "tkbind", "tkconfigure", "tkcurselection",
+           "tkdestroy", "tkentryconfigure", "tkfocus", "tkframe",
+           "tkget", "tkgetSaveFile", "tkgrab.release", "tkgrab.set",
+           "tkinsert", "tkinvoke", "tklabel", "tkmessageBox", "tkplace",
+           "tkpopup", "tkselect", "tkscrollbar", "tkset", "tktoplevel",
+           "tkwait.window", "tkwidget", "tkwinfo",
+           "tkwm.deiconify", "tkwm.focusmodel", "tkwm.geometry",
+           "tkwm.resizable", "tkwm.title", "tkwm.withdraw", "tkxview",
+           "tkyview", "ttkprogressbar")
+importFrom("deldir","deldir", "mid.in", "tile.list")
+importFrom("tcltk2", "tclFun", "tk2button", "tk2checkbutton", "tk2entry", "tk2frame",
+           "tk2ico.destroy", "tk2ico.load", "tk2ico.set", "tk2label",
+           "tk2menu", "tk2menubutton", "tk2notebook", "tk2table")
+importFrom("tkrplot", "tkrplot", "tkrreplot", ".make.tkindex", ".my.tkdev")
 
-export(Biplots)
 
-importFrom(colorspace,heat_hcl,sequential_hcl,terrain_hcl)
-importFrom(KernSmooth,bkde2D)
-importFrom(MASS,ginv,eqscplot)
+
+
+
+
+
+
+
+
+
+
+
+
